@@ -1552,17 +1552,18 @@
     </div>
   </div>
   <div class="topbar-actions">
+    <div id="sync-status" style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:0.5px;"></div>
     <div class="gcal-status" id="gcal-status">
       <span class="gcal-dot" id="gcal-dot"></span>
-      <span id="gcal-status-text">Google Calendar : déconnecté</span>
+      <span id="gcal-status-text">Google : déconnecté</span>
     </div>
-    <button class="btn btn-ghost btn-sm" onclick="openGcalSettings()" title="Configurer Google Calendar">⚙️ Config</button>
-    <button class="btn btn-ghost btn-sm" id="btn-gcal-connect" onclick="gcalConnect()" title="Se connecter à Google Calendar">🔗 Connexion Google</button>
-    <button class="btn btn-sm" id="btn-gcal-sync" onclick="gcalSyncAll()" style="display:none;" title="Synchroniser les tâches vers Google Calendar">📅 Sync Calendar</button>
-    <button class="btn btn-ghost btn-sm" onclick="exportICS()" title="Export fichier ICS">📥 ICS</button>
-    <button class="btn btn-ghost btn-sm" onclick="exportJSON()" title="Sauvegarde JSON">💾 Export</button>
-    <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
-      📂 Import
+    <button class="btn btn-ghost btn-sm" onclick="openGcalSettings()" title="Configurer Google Calendar">⚙️</button>
+    <button class="btn btn-ghost btn-sm" id="btn-gcal-connect" onclick="gcalConnect()" title="Se connecter à Google">🔗 Connexion</button>
+    <button class="btn btn-sm" id="btn-gcal-sync" onclick="gcalSyncAll()" style="display:none;" title="Synchroniser vers Google Calendar">📅 Sync</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportICS()" title="Export fichier ICS">📥</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportJSON()" title="Sauvegarde JSON">💾</button>
+    <label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Importer un fichier JSON">
+      📂
       <input type="file" accept=".json" onchange="importJSON(event)" style="display:none;">
     </label>
   </div>
@@ -1829,7 +1830,7 @@
         <div style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:12px;">
           1. Va sur <a href="https://console.cloud.google.com" target="_blank" style="color:var(--primary);">console.cloud.google.com</a><br>
           2. Crée un projet (ou utilise un existant)<br>
-          3. Active l'API <strong>Google Calendar API</strong> (menu API → Bibliothèque)<br>
+          3. Active l'API <strong>Google Calendar API</strong> ET <strong>Google Drive API</strong> (menu API → Bibliothèque)<br>
           4. Va dans <strong>Identifiants → Créer → ID client OAuth 2.0</strong><br>
           5. Type : <strong>Application Web</strong><br>
           6. Ajoute ton URL GitHub Pages dans <em>"Origines JavaScript autorisées"</em><br>
@@ -1915,13 +1916,15 @@ function initGcalClient() {
   try {
     gcalTokenClient = google.accounts.oauth2.initTokenClient({
       client_id: gcalClientId,
-      scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events',
+      scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file',
       callback: (tokenResponse) => {
         if (tokenResponse && tokenResponse.access_token) {
           gcalAccessToken = tokenResponse.access_token;
           gcalConnected = true;
           updateGcalUI(true);
-          toast('Connecté à Google Calendar', 'success');
+          toast('Connecté à Google — synchronisation...', 'success');
+          // Charger les données depuis Google Drive
+          loadFromCloud();
         } else {
           gcalConnected = false;
           updateGcalUI(false);
@@ -1950,19 +1953,19 @@ function updateGcalUI(connected, configured) {
 
   if (connected) {
     dot.classList.add('connected');
-    text.textContent = 'Google Calendar : connecté';
+    text.textContent = 'Google : connecté';
     text.style.color = 'var(--success)';
     btnConnect.style.display = 'none';
     btnSync.style.display = 'inline-flex';
   } else if (configured) {
     dot.classList.remove('connected');
-    text.textContent = 'Google Calendar : prêt';
+    text.textContent = 'Google : prêt';
     text.style.color = 'var(--warn)';
     btnConnect.style.display = 'inline-flex';
     btnSync.style.display = 'none';
   } else {
     dot.classList.remove('connected');
-    text.textContent = gcalClientId ? 'Google Calendar : déconnecté' : 'Google Calendar : non configuré';
+    text.textContent = gcalClientId ? 'Google : déconnecté' : 'Non configuré';
     text.style.color = 'var(--text-faint)';
     btnConnect.style.display = gcalClientId ? 'inline-flex' : 'none';
     btnSync.style.display = 'none';
@@ -2181,6 +2184,11 @@ try {
   storageAvailable = false;
 }
 
+let cloudSaving = false;
+let cloudFileId = null; // ID du fichier Autorem sur Google Drive
+let saveTimeout = null;
+const CLOUD_FILENAME = 'autorem-data.json';
+
 function loadData() {
   try {
     if (storageAvailable) {
@@ -2264,13 +2272,233 @@ function loadData() {
     ],
   }];
   activeId = affaires[0].id;
-  saveData();
+  saveDataLocal();
 }
 
-function saveData() {
+// Sauvegarde locale (instantanée)
+function saveDataLocal() {
   if (!storageAvailable) return;
   try { localStorage.setItem('autorem-data', JSON.stringify({ affaires })); }
   catch(e) { console.warn('Sauvegarde locale impossible:', e); }
+}
+
+// Sauvegarde combinée : locale immédiate + cloud avec délai
+function saveData() {
+  saveDataLocal();
+  // Sauvegarder dans le cloud avec un délai de 2s pour regrouper les modifications rapides
+  if (gcalConnected && gcalAccessToken) {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => saveToCloud(), 2000);
+    updateSyncStatus('saving');
+  }
+}
+
+// ============ GOOGLE DRIVE CLOUD SYNC ============
+function updateSyncStatus(status) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  switch(status) {
+    case 'saving':
+      el.innerHTML = '<span style="color:var(--warn);">☁️ Sync en cours...</span>';
+      break;
+    case 'saved':
+      el.innerHTML = '<span style="color:var(--success);">☁️ Synchronisé ✓</span>';
+      setTimeout(() => {
+        if (el.innerHTML.includes('Synchronisé')) {
+          el.innerHTML = '<span style="color:var(--text-faint);">☁️ Cloud activé</span>';
+        }
+      }, 3000);
+      break;
+    case 'error':
+      el.innerHTML = '<span style="color:var(--danger);">☁️ Erreur sync</span>';
+      break;
+    case 'loading':
+      el.innerHTML = '<span style="color:var(--primary);">☁️ Chargement cloud...</span>';
+      break;
+    default:
+      el.innerHTML = '<span style="color:var(--text-faint);">☁️ Cloud activé</span>';
+  }
+}
+
+// Trouver le fichier autorem-data.json sur Google Drive
+async function findCloudFile() {
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name='${CLOUD_FILENAME}' and trashed=false&spaces=appDataFolder,drive&fields=files(id,name,modifiedTime)`,
+      { headers: { 'Authorization': 'Bearer ' + gcalAccessToken } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.files && data.files.length > 0) {
+      // Prendre le plus récent
+      data.files.sort((a, b) => new Date(b.modifiedTime) - new Date(a.modifiedTime));
+      cloudFileId = data.files[0].id;
+      return cloudFileId;
+    }
+    return null;
+  } catch(e) {
+    console.error('Erreur recherche fichier cloud:', e);
+    return null;
+  }
+}
+
+// Charger les données depuis Google Drive
+async function loadFromCloud() {
+  if (!gcalConnected || !gcalAccessToken) return;
+  
+  updateSyncStatus('loading');
+  
+  try {
+    // Chercher le fichier
+    const fileId = await findCloudFile();
+    
+    if (!fileId) {
+      // Pas de fichier cloud → on upload les données locales
+      toast('☁️ Première synchro — envoi de vos données vers le cloud', 'success');
+      await saveToCloud();
+      updateSyncStatus('saved');
+      return;
+    }
+
+    // Télécharger le contenu
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: { 'Authorization': 'Bearer ' + gcalAccessToken } }
+    );
+    
+    if (!res.ok) {
+      updateSyncStatus('error');
+      toast('Erreur chargement depuis le cloud', 'error');
+      return;
+    }
+
+    const data = await res.json();
+    
+    if (data.affaires && Array.isArray(data.affaires)) {
+      // Comparer : cloud plus récent que local ?
+      const cloudTime = data.lastSaved ? new Date(data.lastSaved).getTime() : 0;
+      let localTime = 0;
+      try {
+        const localRaw = localStorage.getItem('autorem-data');
+        if (localRaw) {
+          const localData = JSON.parse(localRaw);
+          localTime = localData.lastSaved ? new Date(localData.lastSaved).getTime() : 0;
+        }
+      } catch(e) {}
+
+      if (cloudTime >= localTime || affaires.length <= 1) {
+        // Cloud est plus récent ou local a juste l'exemple → prendre cloud
+        affaires = data.affaires;
+        activeId = affaires.length ? affaires[0].id : null;
+        saveDataLocal();
+        renderSidebar();
+        renderDetail();
+        toast(`☁️ ${affaires.length} affaire(s) chargée(s) depuis le cloud`, 'success');
+      } else {
+        // Local est plus récent → demander
+        if (confirm(`Les données cloud (${data.affaires.length} affaires) sont plus anciennes que vos données locales (${affaires.length} affaires).\n\nVoulez-vous écraser vos données locales avec celles du cloud ?`)) {
+          affaires = data.affaires;
+          activeId = affaires.length ? affaires[0].id : null;
+          saveDataLocal();
+          renderSidebar();
+          renderDetail();
+          toast('☁️ Données cloud restaurées', 'success');
+        } else {
+          // Garder local et écraser le cloud
+          await saveToCloud();
+          toast('☁️ Données locales envoyées vers le cloud', 'success');
+        }
+      }
+    }
+    
+    updateSyncStatus('saved');
+    
+  } catch(e) {
+    console.error('Erreur loadFromCloud:', e);
+    updateSyncStatus('error');
+    toast('Erreur de synchronisation cloud', 'error');
+  }
+}
+
+// Sauvegarder les données vers Google Drive
+async function saveToCloud() {
+  if (!gcalConnected || !gcalAccessToken || cloudSaving) return;
+  cloudSaving = true;
+
+  try {
+    const content = JSON.stringify({
+      affaires,
+      lastSaved: new Date().toISOString(),
+      version: 5,
+      app: 'Autorem',
+    });
+
+    if (cloudFileId) {
+      // Mettre à jour le fichier existant
+      const res = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${cloudFileId}?uploadType=media`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': 'Bearer ' + gcalAccessToken,
+            'Content-Type': 'application/json',
+          },
+          body: content,
+        }
+      );
+      if (res.ok) {
+        updateSyncStatus('saved');
+      } else {
+        console.error('Erreur update cloud:', await res.text());
+        updateSyncStatus('error');
+      }
+    } else {
+      // Créer un nouveau fichier
+      const metadata = {
+        name: CLOUD_FILENAME,
+        mimeType: 'application/json',
+        description: 'Données Autorem - Suivi GTB',
+      };
+
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', new Blob([content], { type: 'application/json' }));
+
+      const res = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+        {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + gcalAccessToken },
+          body: form,
+        }
+      );
+
+      if (res.ok) {
+        const result = await res.json();
+        cloudFileId = result.id;
+        updateSyncStatus('saved');
+      } else {
+        console.error('Erreur création cloud:', await res.text());
+        updateSyncStatus('error');
+      }
+    }
+
+    // Mettre à jour le timestamp local aussi
+    if (storageAvailable) {
+      try {
+        localStorage.setItem('autorem-data', JSON.stringify({
+          affaires,
+          lastSaved: new Date().toISOString(),
+        }));
+      } catch(e) {}
+    }
+
+  } catch(e) {
+    console.error('Erreur saveToCloud:', e);
+    updateSyncStatus('error');
+  }
+  
+  cloudSaving = false;
 }
 
 // ============ UI HELPERS ============
