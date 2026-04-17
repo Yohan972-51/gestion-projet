@@ -1303,14 +1303,26 @@ const MODEL_SUGGESTIONS = {
 };
 
 // ============ STORAGE ============
-async function loadData() {
+// Test si localStorage est disponible
+let storageAvailable = false;
+try {
+  localStorage.setItem('__test__', '1');
+  localStorage.removeItem('__test__');
+  storageAvailable = true;
+} catch(e) {
+  storageAvailable = false;
+}
+
+function loadData() {
   try {
-    const raw = localStorage.getItem('autorem-data');
-    if (raw) {
-      const data = JSON.parse(raw);
-      affaires = data.affaires || [];
-      if (affaires.length > 0) activeId = affaires[0].id;
-      return;
+    if (storageAvailable) {
+      const raw = localStorage.getItem('autorem-data');
+      if (raw) {
+        const data = JSON.parse(raw);
+        affaires = data.affaires || [];
+        if (affaires.length > 0) activeId = affaires[0].id;
+        return;
+      }
     }
   } catch(e) {}
 
@@ -1387,9 +1399,10 @@ async function loadData() {
   saveData();
 }
 
-async function saveData() {
+function saveData() {
+  if (!storageAvailable) return;
   try { localStorage.setItem('autorem-data', JSON.stringify({ affaires })); }
-  catch(e) { toast('Erreur de sauvegarde', 'error'); }
+  catch(e) { console.warn('Sauvegarde locale impossible:', e); }
 }
 
 // ============ UI HELPERS ============
@@ -2047,8 +2060,8 @@ function download(content, filename, type) {
   URL.revokeObjectURL(url);
 }
 
-(async () => {
-  await loadData();
+(() => {
+  loadData();
   if (activeId && !expandedChapters[activeId]) {
     expandedChapters[activeId] = new Set();
     const aff = affaires.find(a => a.id === activeId);
@@ -2058,6 +2071,9 @@ function download(content, filename, type) {
   }
   renderSidebar();
   renderDetail();
+  if (!storageAvailable) {
+    toast('Mode hors-ligne : utilise Export/Import pour sauvegarder', 'error');
+  }
 })();
 </script>
 
