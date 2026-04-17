@@ -2766,6 +2766,10 @@ function switchView(view) {
   if (view === 'planning') renderPlanning();
 }
 
+let googleEvents = []; // Cache des événements Google
+let googleEventsLoaded = false;
+let googleEventsLoading = false;
+
 function getAllEvents() {
   const events = [];
   affaires.forEach((aff, affIndex) => {
@@ -2784,6 +2788,7 @@ function getAllEvents() {
             affaireId: aff.id,
             color,
             type: 'task',
+            source: 'autorem',
           });
         }
       });
@@ -2800,10 +2805,104 @@ function getAllEvents() {
         affaireId: aff.id,
         color,
         type: 'livraison',
+        source: 'autorem',
       });
     }
   });
+
+  // Ajouter les événements Google Calendar
+  googleEvents.forEach(gev => {
+    events.push(gev);
+  });
+
   return events;
+}
+
+async function fetchGoogleEvents() {
+  if (!gcalConnected || !gcalAccessToken) return;
+  if (googleEventsLoading) return;
+  googleEventsLoading = true;
+
+  try {
+    // Fenêtre : 6 mois passés → 12 mois futurs
+    const now = new Date();
+    const timeMin = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString();
+    const timeMax = new Date(now.getFullYear(), now.getMonth() + 12, 0).toISOString();
+
+    // Lister les calendriers de l'utilisateur
+    const calList = await gcalApiRequest('GET', 'https://www.googleapis.com/calendar/v3/users/me/calendarList');
+    if (!calList || !calList.items) {
+      googleEventsLoading = false;
+      return;
+    }
+
+    googleEvents = [];
+
+    for (const cal of calList.items) {
+      // Couleur du calendrier
+      const calColor = cal.backgroundColor || '#64748b';
+
+      const eventsResult = await gcalApiRequest('GET',
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal.id)}/events?timeMin=${timeMin}&timeMax=${timeMax}&maxResults=500&singleEvents=true&orderBy=startTime`
+      );
+
+      if (eventsResult && eventsResult.items) {
+        eventsResult.items.forEach(ev => {
+          // Ignorer les événements déjà créés par Autorem (éviter les doublons)
+          if (ev.extendedProperties?.private?.autoremiId) return;
+
+          // Extraire la date (tout le jour ou date/heure)
+          let date = '';
+          let timeStr = '';
+          let endTimeStr = '';
+          if (ev.start?.date) {
+            // Événement toute la journée
+            date = ev.start.date;
+          } else if (ev.start?.dateTime) {
+            date = ev.start.dateTime.split('T')[0];
+            timeStr = new Date(ev.start.dateTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            if (ev.end?.dateTime) {
+              endTimeStr = new Date(ev.end.dateTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            }
+          }
+
+          if (!date) return;
+
+          googleEvents.push({
+            date,
+            text: ev.summary || '(sans titre)',
+            done: false,
+            priority: 'moyenne',
+            chapter: '',
+            affaireRef: cal.summary || 'Google',
+            affaireName: cal.summary || 'Google Calendar',
+            affaireId: null,
+            color: calColor,
+            type: 'google',
+            source: 'google',
+            calendarName: cal.summary || '',
+            location: ev.location || '',
+            timeStr,
+            endTimeStr,
+            googleEventId: ev.id,
+            googleCalId: cal.id,
+          });
+        });
+      }
+    }
+
+    googleEventsLoaded = true;
+    googleEventsLoading = false;
+    toast(`📅 ${googleEvents.length} événement(s) importé(s) de Google Calendar`, 'success');
+
+    // Re-render si on est sur le planning
+    if (currentView === 'planning') renderPlanning();
+
+  } catch(e) {
+    console.error('Erreur fetch Google Events:', e);
+    googleEventsLoading = false;
+    toast('Erreur lors de la récupération du planning Google', 'error');
+  }
 }
 
 function renderPlanning() {
@@ -2812,7 +2911,36 @@ function renderPlanning() {
   const year = planningDate.getFullYear();
   const month = planningDate.getMonth();
 
+  const gcalLoaded = googleEventsLoaded && gcalConnected;
+  const gcalAvailable = gcalConnected && gcalAccessToken;
+
   container.innerHTML = `
+    ${gcalAvailable ? `
+    <div class="gcal-info-bar">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="gcal-dot connected"></span>
+        <span style="font-size:12px;color:var(--text-dim);">
+          ${gcalLoaded ? `${googleEvents.length} événement(s) Google Calendar chargé(s)` : 'Google Calendar connecté'}
+        </span>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm" onclick="fetchGoogleEvents()" ${googleEventsLoading ? 'disabled' : ''}>
+          ${googleEventsLoading ? '⏳ Chargement...' : '🔄 Récupérer mon planning Google'}
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="gcalSyncAll()">📤 Envoyer vers Google</button>
+      </div>
+    </div>
+    ` : `
+    <div class="gcal-info-bar">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="gcal-dot"></span>
+        <span style="font-size:12px;color:var(--text-faint);">
+          Connecte-toi à Google Calendar pour voir tes événements ici
+        </span>
+      </div>
+      <button class="btn btn-sm" onclick="gcalConnect()">🔗 Connexion Google</button>
+    </div>
+    `}
     <div class="planning-header">
       <div class="planning-nav">
         <button class="planning-nav-btn" onclick="planningPrev()">◀</button>
@@ -2836,13 +2964,27 @@ function renderPlanning() {
 }
 
 function renderPlanningLegend() {
-  if (!affaires.length) return '';
+  // Collecter les calendriers Google uniques
+  const googleCals = {};
+  googleEvents.forEach(ev => {
+    if (ev.calendarName && !googleCals[ev.calendarName]) {
+      googleCals[ev.calendarName] = ev.color;
+    }
+  });
+  const hasContent = affaires.length || Object.keys(googleCals).length;
+  if (!hasContent) return '';
   return `
     <div class="planning-legend">
       ${affaires.map((aff, i) => `
         <div class="legend-item">
           <div class="legend-dot" style="background:${getAffaireColor(i)};"></div>
           <span>${escapeHtml(aff.ref || aff.name)}</span>
+        </div>
+      `).join('')}
+      ${Object.entries(googleCals).map(([name, color]) => `
+        <div class="legend-item">
+          <div class="legend-dot" style="background:${color};"></div>
+          <span>📅 ${escapeHtml(name)}</span>
         </div>
       `).join('')}
       <div class="legend-item"><div class="legend-dot" style="background:var(--danger);"></div><span>Haute priorité</span></div>
@@ -2908,7 +3050,7 @@ function renderMonthView() {
 function renderCalDay(dayNum, dateStr, events, today, isOtherMonth) {
   const isToday = dateStr === today;
   const nowDate = new Date(new Date().toDateString());
-  const maxShow = 3;
+  const maxShow = 4;
   const shown = events.slice(0, maxShow);
   const remaining = events.length - maxShow;
 
@@ -2916,12 +3058,18 @@ function renderCalDay(dayNum, dateStr, events, today, isOtherMonth) {
     <div class="cal-day ${isToday ? 'today' : ''} ${isOtherMonth ? 'other-month' : ''}">
       <div class="cal-day-num">${dayNum}</div>
       ${shown.map(ev => {
-        const isOverdue = !ev.done && new Date(ev.date) < nowDate;
-        return `<div class="cal-event ${ev.done ? 'done' : ''} priority-${ev.priority} ${ev.type === 'livraison' ? 'livraison' : ''} ${isOverdue ? 'overdue-event' : ''}" 
-          style="background:${ev.color}22;color:${ev.color};"
-          title="${escapeHtml(ev.affaireRef)}: ${escapeHtml(ev.text)}\n${escapeHtml(ev.chapter)}"
-          onclick="event.stopPropagation();goToAffaire(${ev.affaireId})">
-          ${escapeHtml(ev.text)}
+        const isOverdue = ev.source === 'autorem' && !ev.done && new Date(ev.date) < nowDate;
+        const isGoogle = ev.source === 'google';
+        const timeLabel = ev.timeStr ? ev.timeStr + ' ' : '';
+        const clickAction = ev.affaireId ? `onclick="event.stopPropagation();goToAffaire(${ev.affaireId})"` : '';
+        const tooltip = isGoogle
+          ? `${escapeHtml(ev.calendarName || 'Google')}: ${escapeHtml(ev.text)}${ev.timeStr ? '\\n' + ev.timeStr + (ev.endTimeStr ? ' → ' + ev.endTimeStr : '') : ''}${ev.location ? '\\n📍 ' + escapeHtml(ev.location) : ''}`
+          : `${escapeHtml(ev.affaireRef)}: ${escapeHtml(ev.text)}\\n${escapeHtml(ev.chapter)}`;
+        return `<div class="cal-event ${ev.done ? 'done' : ''} ${!isGoogle ? 'priority-' + ev.priority : ''} ${ev.type === 'livraison' ? 'livraison' : ''} ${isOverdue ? 'overdue-event' : ''}" 
+          style="background:${ev.color}22;color:${ev.color};${isGoogle ? 'border-left-color:' + ev.color + ';' : ''}"
+          title="${tooltip}"
+          ${clickAction}>
+          ${isGoogle ? '<span style="opacity:0.6;font-size:9px;">📅 </span>' : ''}${timeLabel}${escapeHtml(ev.text)}
         </div>`;
       }).join('')}
       ${remaining > 0 ? `<div class="cal-more">+${remaining} autre${remaining > 1 ? 's' : ''}</div>` : ''}
@@ -2947,13 +3095,16 @@ function renderWeekView() {
     const dd = new Date(weekStart);
     dd.setDate(dd.getDate() + i);
     const dateStr = dd.toISOString().split('T')[0];
+    const dayEvents = events.filter(ev => ev.date === dateStr);
+    // Trier : événements avec heure d'abord, puis les autres
+    dayEvents.sort((a, b) => (a.timeStr || '99:99').localeCompare(b.timeStr || '99:99'));
     days.push({
       date: dd,
       dateStr,
       name: dayNames[i],
       num: dd.getDate(),
       isToday: dateStr === todayStr,
-      events: events.filter(ev => ev.date === dateStr),
+      events: dayEvents,
     });
   }
 
@@ -2967,15 +3118,19 @@ function renderWeekView() {
           </div>
           <div style="padding:8px;min-height:200px;">
             ${day.events.length === 0 ? '<div style="color:var(--text-faint);font-size:10px;text-align:center;padding:20px 0;">—</div>' :
-              day.events.map(ev => `
-                <div class="cal-event priority-${ev.priority} ${ev.done ? 'done' : ''} ${ev.type === 'livraison' ? 'livraison' : ''}"
-                  style="background:${ev.color}22;color:${ev.color};margin-bottom:4px;font-size:10px;white-space:normal;"
-                  title="${escapeHtml(ev.affaireRef)}: ${escapeHtml(ev.text)}"
-                  onclick="goToAffaire(${ev.affaireId})">
-                  <div style="font-weight:600;margin-bottom:2px;">${escapeHtml(ev.text)}</div>
-                  <div style="opacity:0.7;font-size:9px;">${escapeHtml(ev.affaireRef)}</div>
+              day.events.map(ev => {
+                const isGoogle = ev.source === 'google';
+                const clickAction = ev.affaireId ? `onclick="goToAffaire(${ev.affaireId})"` : '';
+                return `
+                <div class="cal-event ${!isGoogle ? 'priority-' + ev.priority : ''} ${ev.done ? 'done' : ''} ${ev.type === 'livraison' ? 'livraison' : ''}"
+                  style="background:${ev.color}22;color:${ev.color};margin-bottom:4px;font-size:10px;white-space:normal;${isGoogle ? 'border-left-color:' + ev.color + ';' : ''}"
+                  title="${isGoogle && ev.location ? '📍 ' + escapeHtml(ev.location) : ''}"
+                  ${clickAction}>
+                  ${ev.timeStr ? `<div style="font-family:'JetBrains Mono';font-size:9px;opacity:0.7;margin-bottom:2px;">${ev.timeStr}${ev.endTimeStr ? ' → ' + ev.endTimeStr : ''}</div>` : ''}
+                  <div style="font-weight:600;margin-bottom:2px;">${isGoogle ? '📅 ' : ''}${escapeHtml(ev.text)}</div>
+                  <div style="opacity:0.7;font-size:9px;">${escapeHtml(isGoogle ? (ev.calendarName || 'Google') : ev.affaireRef)}</div>
                 </div>
-              `).join('')
+              `}).join('')
             }
           </div>
         </div>
@@ -3029,16 +3184,23 @@ function renderListView() {
           <span>${isToday ? '📍 AUJOURD\'HUI — ' : ''}${dayName} ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
           <span>${byDate[date].length} tâche${byDate[date].length > 1 ? 's' : ''}</span>
         </div>
-        ${byDate[date].map(ev => `
-          <div class="planning-list-item" onclick="goToAffaire(${ev.affaireId})">
+        ${byDate[date].map(ev => {
+            const isGoogle = ev.source === 'google';
+            const clickAction = ev.affaireId ? `onclick="goToAffaire(${ev.affaireId})"` : '';
+            const metaText = isGoogle
+              ? `📅 ${escapeHtml(ev.calendarName || 'Google')}${ev.timeStr ? ' · ' + ev.timeStr + (ev.endTimeStr ? ' → ' + ev.endTimeStr : '') : ''}${ev.location ? ' · 📍 ' + escapeHtml(ev.location) : ''}`
+              : `${escapeHtml(ev.affaireRef)} · ${escapeHtml(ev.chapter)}`;
+            return `
+          <div class="planning-list-item" ${clickAction} style="${!ev.affaireId ? 'cursor:default;' : ''}">
             <div class="planning-list-color" style="background:${ev.color};"></div>
             <div class="planning-list-info">
-              <div class="planning-list-task" style="${ev.done ? 'text-decoration:line-through;opacity:0.5;' : ''}">${escapeHtml(ev.text)}</div>
-              <div class="planning-list-meta">${escapeHtml(ev.affaireRef)} · ${escapeHtml(ev.chapter)}</div>
+              <div class="planning-list-task" style="${ev.done ? 'text-decoration:line-through;opacity:0.5;' : ''}">${isGoogle ? '📅 ' : ''}${escapeHtml(ev.text)}</div>
+              <div class="planning-list-meta">${metaText}</div>
             </div>
-            <span class="planning-list-priority" style="background:${ev.priority === 'haute' ? 'rgba(239,68,68,0.15);color:var(--danger)' : ev.priority === 'basse' ? 'rgba(37,99,235,0.15);color:var(--secondary)' : 'rgba(234,179,8,0.15);color:var(--warn)'};">${ev.priority}</span>
+            ${isGoogle ? '<span class="planning-list-priority" style="background:rgba(37,99,235,0.15);color:var(--secondary);">google</span>' :
+              `<span class="planning-list-priority" style="background:${ev.priority === 'haute' ? 'rgba(239,68,68,0.15);color:var(--danger)' : ev.priority === 'basse' ? 'rgba(37,99,235,0.15);color:var(--secondary)' : 'rgba(234,179,8,0.15);color:var(--warn)'};">${ev.priority}</span>`}
           </div>
-        `).join('')}
+          `}).join('')}
       </div>
     `;
   }).join('');
