@@ -1557,9 +1557,11 @@
       <span class="gcal-dot" id="gcal-dot"></span>
       <span id="gcal-status-text">Google : déconnecté</span>
     </div>
-    <button class="btn btn-ghost btn-sm" onclick="openGcalSettings()" title="Configurer Google Calendar">⚙️</button>
+    <button class="btn btn-ghost btn-sm" onclick="openGcalSettings()" title="Configurer">⚙️</button>
     <button class="btn btn-ghost btn-sm" id="btn-gcal-connect" onclick="gcalConnect()" title="Se connecter à Google">🔗 Connexion</button>
-    <button class="btn btn-sm" id="btn-gcal-sync" onclick="gcalSyncAll()" style="display:none;" title="Synchroniser vers Google Calendar">📅 Sync</button>
+    <button class="btn btn-sm" id="btn-cloud-push" onclick="forceCloudPush()" style="display:none;" title="Envoyer mes données vers le cloud">☁️ Envoyer ↑</button>
+    <button class="btn btn-ghost btn-sm" id="btn-cloud-pull" onclick="forceCloudPull()" style="display:none;" title="Récupérer les données depuis le cloud">☁️ Récupérer ↓</button>
+    <button class="btn btn-sm" id="btn-gcal-sync" onclick="gcalSyncAll()" style="display:none;" title="Synchroniser vers Google Calendar">📅 Sync Cal</button>
     <button class="btn btn-ghost btn-sm" onclick="exportICS()" title="Export fichier ICS">📥</button>
     <button class="btn btn-ghost btn-sm" onclick="exportJSON()" title="Sauvegarde JSON">💾</button>
     <label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Importer un fichier JSON">
@@ -1950,6 +1952,8 @@ function updateGcalUI(connected, configured) {
   const text = document.getElementById('gcal-status-text');
   const btnConnect = document.getElementById('btn-gcal-connect');
   const btnSync = document.getElementById('btn-gcal-sync');
+  const btnPush = document.getElementById('btn-cloud-push');
+  const btnPull = document.getElementById('btn-cloud-pull');
 
   if (connected) {
     dot.classList.add('connected');
@@ -1957,18 +1961,24 @@ function updateGcalUI(connected, configured) {
     text.style.color = 'var(--success)';
     btnConnect.style.display = 'none';
     btnSync.style.display = 'inline-flex';
+    btnPush.style.display = 'inline-flex';
+    btnPull.style.display = 'inline-flex';
   } else if (configured) {
     dot.classList.remove('connected');
     text.textContent = 'Google : prêt';
     text.style.color = 'var(--warn)';
     btnConnect.style.display = 'inline-flex';
     btnSync.style.display = 'none';
+    btnPush.style.display = 'none';
+    btnPull.style.display = 'none';
   } else {
     dot.classList.remove('connected');
     text.textContent = gcalClientId ? 'Google : déconnecté' : 'Non configuré';
     text.style.color = 'var(--text-faint)';
     btnConnect.style.display = gcalClientId ? 'inline-flex' : 'none';
     btnSync.style.display = 'none';
+    btnPush.style.display = 'none';
+    btnPull.style.display = 'none';
   }
 }
 
@@ -2499,6 +2509,83 @@ async function saveToCloud() {
   }
   
   cloudSaving = false;
+}
+
+// ============ BOUTONS SYNCHRO MANUELS ============
+
+// Forcer l'envoi des données locales vers le cloud
+async function forceCloudPush() {
+  if (!gcalConnected || !gcalAccessToken) {
+    toast('Connecte-toi d\'abord à Google', 'error');
+    return;
+  }
+  
+  if (!confirm(`Envoyer vos ${affaires.length} affaire(s) vers le cloud ?\n\nCeci écrasera les données cloud avec vos données locales.`)) return;
+  
+  toast('☁️ Envoi vers le cloud...', 'success');
+  cloudFileId = null; // Forcer la recherche du fichier
+  await findCloudFile();
+  await saveToCloud();
+  toast(`☁️ ${affaires.length} affaire(s) envoyée(s) vers le cloud ✓`, 'success');
+}
+
+// Forcer la récupération des données depuis le cloud
+async function forceCloudPull() {
+  if (!gcalConnected || !gcalAccessToken) {
+    toast('Connecte-toi d\'abord à Google', 'error');
+    return;
+  }
+  
+  updateSyncStatus('loading');
+  
+  try {
+    const fileId = await findCloudFile();
+    
+    if (!fileId) {
+      toast('Aucune donnée trouvée dans le cloud. Utilise "Envoyer ↑" d\'abord depuis le PC qui a tes données.', 'error');
+      updateSyncStatus('error');
+      return;
+    }
+
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: { 'Authorization': 'Bearer ' + gcalAccessToken } }
+    );
+    
+    if (!res.ok) {
+      toast('Erreur de téléchargement depuis le cloud', 'error');
+      updateSyncStatus('error');
+      return;
+    }
+
+    const data = await res.json();
+    
+    if (!data.affaires || !Array.isArray(data.affaires)) {
+      toast('Fichier cloud invalide', 'error');
+      updateSyncStatus('error');
+      return;
+    }
+
+    const lastSaved = data.lastSaved ? new Date(data.lastSaved).toLocaleString('fr-FR') : 'date inconnue';
+    
+    if (!confirm(`${data.affaires.length} affaire(s) trouvée(s) dans le cloud.\nDernière sauvegarde : ${lastSaved}\n\nRemplacer vos données locales par celles du cloud ?`)) {
+      updateSyncStatus('saved');
+      return;
+    }
+
+    affaires = data.affaires;
+    activeId = affaires.length ? affaires[0].id : null;
+    saveDataLocal();
+    renderSidebar();
+    renderDetail();
+    updateSyncStatus('saved');
+    toast(`☁️ ${affaires.length} affaire(s) récupérée(s) depuis le cloud ✓`, 'success');
+    
+  } catch(e) {
+    console.error('Erreur forceCloudPull:', e);
+    toast('Erreur de récupération cloud', 'error');
+    updateSyncStatus('error');
+  }
 }
 
 // ============ UI HELPERS ============
