@@ -1,0 +1,2065 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autorem</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --bg: #0a0f1a;
+    --bg-elev: #111827;
+    --bg-card: #1a2234;
+    --bg-soft: #151d2e;
+    --border: #232e44;
+    --border-hover: #2f3d59;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --text-faint: #64748b;
+    --primary: #2563eb;
+    --primary-dim: #1d4ed8;
+    --primary-soft: rgba(37, 99, 235, 0.12);
+    --secondary: #10b981;
+    --accent: #10b981;
+    --warn: #eab308;
+    --success: #10b981;
+    --danger: #ef4444;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-weight: 400;
+    background-image:
+      radial-gradient(circle at 20% 0%, rgba(37, 99, 235, 0.07) 0%, transparent 50%),
+      radial-gradient(circle at 80% 100%, rgba(16, 185, 129, 0.06) 0%, transparent 50%);
+  }
+
+  /* Header */
+  .topbar {
+    background: rgba(17, 24, 39, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .brand-logo {
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 18px;
+    color: white;
+    box-shadow: 0 4px 20px rgba(37, 99, 235, 0.3);
+    position: relative;
+    overflow: hidden;
+    font-family: 'JetBrains Mono';
+    letter-spacing: -1px;
+  }
+
+  .brand-logo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent, rgba(255,255,255,0.2));
+  }
+
+  .brand-text h1 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .brand-text p {
+    font-family: 'JetBrains Mono';
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 1.5px;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+
+  .topbar-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  /* Layout */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: calc(100vh - 68px);
+  }
+
+  .sidebar {
+    background: var(--bg-elev);
+    border-right: 1px solid var(--border);
+    padding: 20px;
+    overflow-y: auto;
+    max-height: calc(100vh - 68px);
+  }
+
+  .new-btn {
+    width: 100%;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: white;
+    border: none;
+    padding: 13px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 4px 20px rgba(37, 99, 235, 0.25);
+    transition: all 0.2s;
+    letter-spacing: -0.01em;
+  }
+
+  .new-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 24px rgba(37, 99, 235, 0.35);
+  }
+
+  .section-label {
+    font-family: 'JetBrains Mono';
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .count-badge {
+    background: var(--bg-soft);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+  }
+
+  .affaire-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .affaire-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--text-faint);
+    transition: background 0.2s;
+  }
+
+  .affaire-item:hover {
+    border-color: var(--border-hover);
+    transform: translateX(2px);
+  }
+
+  .affaire-item.active {
+    border-color: var(--primary);
+    background: var(--bg-soft);
+  }
+
+  .affaire-item.active::before {
+    background: linear-gradient(to bottom, var(--primary), var(--accent));
+  }
+
+  .aff-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 6px;
+    gap: 8px;
+  }
+
+  .aff-ref {
+    font-family: 'JetBrains Mono';
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 1px;
+  }
+
+  .aff-name {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+
+  .aff-automate {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--primary);
+    font-family: 'JetBrains Mono';
+    margin-bottom: 8px;
+  }
+
+  .aff-automate .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--primary);
+    box-shadow: 0 0 8px var(--primary);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .aff-loc {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+
+  .progress-track {
+    height: 5px;
+    background: var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    transition: width 0.5s ease;
+    border-radius: 10px;
+  }
+
+  .aff-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .progress-pct {
+    font-family: 'JetBrains Mono';
+    font-size: 11px;
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  .status-pill {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+    font-family: 'JetBrains Mono';
+    letter-spacing: 0.5px;
+  }
+
+  .status-etude { background: rgba(16, 185, 129, 0.15); color: var(--accent); }
+  .status-programmation { background: rgba(59, 130, 246, 0.15); color: var(--secondary); }
+  .status-mise-au-point { background: rgba(234, 179, 8, 0.15); color: var(--warn); }
+  .status-recette { background: rgba(37, 99, 235, 0.15); color: var(--primary); }
+  .status-livre { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+  .status-sav { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+
+  /* Content */
+  .content {
+    padding: 24px;
+    overflow-y: auto;
+    max-height: calc(100vh - 68px);
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+    color: var(--text-faint);
+    text-align: center;
+  }
+
+  .empty-state svg { margin-bottom: 20px; opacity: 0.3; }
+
+  .detail-header {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    padding: 24px;
+    margin-bottom: 20px;
+    border-radius: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .detail-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, var(--primary-soft), transparent 70%);
+    pointer-events: none;
+  }
+
+  .detail-meta-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .detail-ref {
+    font-family: 'JetBrains Mono';
+    font-size: 11px;
+    color: var(--primary);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .detail-header h2 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+
+  .detail-automate-banner {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--primary-soft);
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono';
+    font-size: 12px;
+    color: var(--primary);
+    margin-top: 6px;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+    margin-top: 18px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .meta-item .label {
+    font-family: 'JetBrains Mono';
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .meta-item .value {
+    font-size: 14px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .meta-item .value.mono {
+    font-family: 'JetBrains Mono';
+    font-size: 13px;
+  }
+
+  /* KPI */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .kpi {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 18px;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .kpi-label {
+    font-family: 'JetBrains Mono';
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .kpi-value {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  .kpi-value.primary { color: var(--primary); }
+  .kpi-value.accent { color: var(--accent); }
+  .kpi-value.success { color: var(--success); }
+  .kpi-value.warn { color: var(--warn); }
+  .kpi-value.danger { color: var(--danger); }
+
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  /* Panels */
+  .panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .panel-head {
+    background: var(--bg-elev);
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .panel-head h3 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .panel-body { padding: 18px; }
+
+  /* Chapters */
+  .chapter {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: all 0.2s;
+  }
+
+  .chapter.expanded { border-color: var(--primary); }
+
+  .chapter-head {
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .chapter-head:hover { background: rgba(37, 99, 235, 0.04); }
+
+  .chapter-chevron {
+    color: var(--text-dim);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+
+  .chapter.expanded .chapter-chevron { transform: rotate(90deg); color: var(--primary); }
+
+  .chapter-info { flex: 1; min-width: 0; }
+
+  .chapter-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .chapter-icon { font-size: 16px; }
+
+  .chapter-title {
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+  }
+
+  .chapter-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .chapter-progress {
+    flex: 1;
+    max-width: 160px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .chapter-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    border-radius: 10px;
+    transition: width 0.4s;
+  }
+
+  .chapter-count {
+    font-family: 'JetBrains Mono';
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .chapter-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .chapter:hover .chapter-actions { opacity: 1; }
+
+  .chapter-action-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+
+  .chapter-action-btn:hover { color: var(--primary); background: var(--primary-soft); }
+  .chapter-action-btn.danger:hover { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+
+  .chapter-body {
+    display: none;
+    padding: 0 16px 16px 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .chapter.expanded .chapter-body { display: block; }
+
+  .chapter-section { margin-top: 14px; }
+
+  .chapter-section-title {
+    font-family: 'JetBrains Mono';
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Form elements */
+  .task-add-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .input, .select, .textarea {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 9px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    border-radius: 8px;
+    outline: none;
+    transition: all 0.15s;
+    width: 100%;
+  }
+
+  .input:focus, .select:focus, .textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+  }
+
+  .textarea { resize: vertical; min-height: 70px; font-family: inherit; }
+  .mono-input { font-family: 'JetBrains Mono'; font-size: 12px; }
+
+  .btn {
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: white;
+    border: none;
+    padding: 9px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
+
+  .btn-ghost {
+    background: var(--bg);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    box-shadow: none;
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-soft);
+    transform: none;
+    box-shadow: none;
+  }
+
+  .btn-sm { padding: 6px 10px; font-size: 11px; }
+
+  .task {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    transition: all 0.15s;
+  }
+
+  .task:hover { border-color: var(--border-hover); }
+  .task.done { opacity: 0.55; }
+
+  .task-check {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--text-faint);
+    border-radius: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    transition: all 0.15s;
+    margin-top: 1px;
+  }
+
+  .task-check:hover { border-color: var(--primary); }
+
+  .task.done .task-check {
+    background: var(--success);
+    border-color: var(--success);
+  }
+
+  .task-body { flex: 1; min-width: 0; }
+
+  .task-text { font-size: 13px; line-height: 1.4; }
+  .task.done .task-text { text-decoration: line-through; }
+
+  .task-meta {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+    font-family: 'JetBrains Mono';
+    font-size: 10px;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+  }
+
+  .task-meta-item { display: flex; align-items: center; gap: 4px; }
+  .task-meta-item.overdue { color: var(--danger); font-weight: 500; }
+
+  .task-delete {
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 13px;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .task-delete:hover { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+
+  .comment {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+  }
+
+  .comment-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .comment-date {
+    font-family: 'JetBrains Mono';
+    font-size: 10px;
+    color: var(--text-faint);
+  }
+
+  .comment-text {
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    color: var(--text);
+  }
+
+  .comment-add {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* Map */
+  #map {
+    height: 340px;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+    background: var(--bg-elev);
+    color: var(--text);
+    border: 1px solid var(--primary);
+    border-radius: 10px;
+  }
+  .leaflet-popup-content { margin: 12px 14px; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 20px;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    max-width: 680px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .modal-head {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: var(--bg-elev);
+    z-index: 10;
+  }
+
+  .modal-head h3 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 20px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    transition: all 0.15s;
+  }
+
+  .modal-close:hover { background: var(--bg-card); color: var(--text); }
+
+  .modal-body { padding: 24px; }
+
+  .form-section {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .form-section:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+
+  .form-section-title {
+    font-family: 'JetBrains Mono';
+    font-size: 11px;
+    color: var(--primary);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .form-section-title::before {
+    content: '';
+    width: 20px;
+    height: 2px;
+    background: var(--primary);
+  }
+
+  .form-group { margin-bottom: 14px; }
+
+  .form-label {
+    display: block;
+    font-family: 'JetBrains Mono';
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .form-row-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+
+  .geo-helper {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .modal-foot {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-elev);
+  }
+
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .icon-option {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .icon-option:hover { border-color: var(--primary); background: var(--primary-soft); }
+  .icon-option.selected { border-color: var(--primary); background: var(--primary-soft); transform: scale(1.05); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--bg-elev);
+    border: 1px solid var(--primary);
+    border-left: 4px solid var(--primary);
+    padding: 12px 18px;
+    border-radius: 10px;
+    z-index: 3000;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    transform: translateX(400px);
+    transition: transform 0.3s;
+    font-size: 13px;
+    max-width: 300px;
+  }
+
+  .toast.show { transform: translateX(0); }
+  .toast.error { border-color: var(--danger); border-left-color: var(--danger); }
+  .toast.success { border-color: var(--success); border-left-color: var(--success); }
+
+  /* Bus tag */
+  .bus-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono';
+    font-size: 10px;
+    color: var(--primary);
+    margin-right: 4px;
+    margin-bottom: 4px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .sidebar { max-height: none; border-right: none; border-bottom: 1px solid var(--border); }
+    .content { max-height: none; }
+    .form-row, .form-row-3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-logo">Ar</div>
+    <div class="brand-text">
+      <h1>Autorem</h1>
+      <p>GTB · Automation · Supervision</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost btn-sm" onclick="exportICS()" title="Export Google Calendar">📅 Calendrier</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportJSON()" title="Sauvegarde JSON">💾 Export</button>
+    <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
+      📂 Import
+      <input type="file" accept=".json" onchange="importJSON(event)" style="display:none;">
+    </label>
+  </div>
+</div>
+
+<div class="main-grid">
+  <aside class="sidebar">
+    <button class="new-btn" onclick="openAffaireModal()">＋ Nouvelle affaire GTB</button>
+    <div class="section-label">
+      <span>Affaires</span>
+      <span class="count-badge" id="count-badge">0</span>
+    </div>
+    <div id="affaire-list"></div>
+  </aside>
+
+  <main class="content">
+    <div id="detail-view">
+      <div class="empty-state">
+        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M7 7h2v2H7zM11 7h2v2h-2zM15 7h2v2h-2zM7 11h2v2H7zM11 11h2v2h-2zM15 11h2v2h-2zM7 15h2v2H7zM11 15h2v2h-2zM15 15h2v2h-2z"/>
+        </svg>
+        <h2 style="font-size:22px;font-weight:600;margin-bottom:8px;letter-spacing:-0.02em;">Aucune affaire sélectionnée</h2>
+        <p style="font-size:13px;">Crée ou sélectionne une affaire GTB pour commencer</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal affaire -->
+<div class="modal-overlay" id="affaire-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modal-title">Nouvelle affaire GTB</h3>
+      <button class="modal-close" onclick="closeAffaireModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="form-section">
+        <div class="form-section-title">Identification</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Nom de l'affaire *</label>
+            <input type="text" class="input" id="f-name" placeholder="Tour Alpha - Rénovation GTB">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Référence affaire</label>
+            <input type="text" class="input mono-input" id="f-ref" placeholder="GTB-2026-042">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Statut</label>
+            <select class="select" id="f-status">
+              <option value="etude">Étude</option>
+              <option value="programmation" selected>Programmation</option>
+              <option value="mise-au-point">Mise au point</option>
+              <option value="recette">Recette</option>
+              <option value="livre">Livré</option>
+              <option value="sav">SAV</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Type de site</label>
+            <select class="select" id="f-site-type">
+              <option value="Tertiaire">Tertiaire</option>
+              <option value="Industriel">Industriel</option>
+              <option value="Hôpital">Hôpital</option>
+              <option value="Scolaire">Scolaire</option>
+              <option value="Logement">Logement collectif</option>
+              <option value="Hôtel">Hôtellerie</option>
+              <option value="Datacenter">Datacenter</option>
+              <option value="Data Center">Centre commercial</option>
+              <option value="Autre">Autre</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">Automate & Programmation</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Marque automate *</label>
+            <select class="select" id="f-brand" onchange="updateModelOptions()">
+              <option value="">— Sélectionner —</option>
+              <option value="Schneider Electric">Schneider Electric</option>
+              <option value="Siemens">Siemens</option>
+              <option value="Wago">Wago</option>
+              <option value="Beckhoff">Beckhoff</option>
+              <option value="Trend Controls">Trend Controls</option>
+              <option value="Distech Controls">Distech Controls</option>
+              <option value="Johnson Controls">Johnson Controls</option>
+              <option value="Sauter">Sauter</option>
+              <option value="Honeywell">Honeywell</option>
+              <option value="Delta Controls">Delta Controls</option>
+              <option value="ABB">ABB</option>
+              <option value="Priva">Priva</option>
+              <option value="Regin">Regin</option>
+              <option value="Carel">Carel</option>
+              <option value="Belimo">Belimo</option>
+              <option value="Loytec">Loytec</option>
+              <option value="Saia Burgess">Saia Burgess</option>
+              <option value="Autre">Autre</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Modèle / Gamme</label>
+            <input type="text" class="input mono-input" id="f-model" list="model-suggestions" placeholder="Ex: M340, PCD3, TAC Xenta...">
+            <datalist id="model-suggestions"></datalist>
+          </div>
+        </div>
+        <div class="form-row-3">
+          <div class="form-group">
+            <label class="form-label">Logiciel / Atelier</label>
+            <input type="text" class="input mono-input" id="f-software" placeholder="Unity Pro, TIA Portal, EBO...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Version firmware</label>
+            <input type="text" class="input mono-input" id="f-firmware" placeholder="v2.14.3">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Superviseur</label>
+            <input type="text" class="input" id="f-supervisor" placeholder="Desigo CC, Niagara, EBO...">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">Architecture & Communication</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Protocoles bus</label>
+            <input type="text" class="input mono-input" id="f-protocols" placeholder="BACnet IP, Modbus RTU, KNX (virgules)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nombre de points I/O</label>
+            <input type="number" class="input" id="f-points" placeholder="128">
+          </div>
+        </div>
+        <div class="form-row-3">
+          <div class="form-group">
+            <label class="form-label">IP automate</label>
+            <input type="text" class="input mono-input" id="f-ip" placeholder="192.168.1.10">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Accès distant</label>
+            <select class="select" id="f-remote">
+              <option value="">Aucun</option>
+              <option value="VPN">VPN</option>
+              <option value="TeamViewer">TeamViewer</option>
+              <option value="AnyDesk">AnyDesk</option>
+              <option value="IP publique">IP publique</option>
+              <option value="Cloud">Cloud constructeur</option>
+              <option value="Autre">Autre</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nb d'automates</label>
+            <input type="number" class="input" id="f-plc-count" placeholder="1">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">Localisation & Intervenants</div>
+        <div class="form-group">
+          <label class="form-label">Adresse du site *</label>
+          <input type="text" class="input" id="f-addr" placeholder="25 rue de la Défense, 92400 Courbevoie">
+          <div class="geo-helper">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="geocodeAddress()">📍 Géolocaliser</button>
+            <span id="geo-result"></span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Latitude</label>
+            <input type="number" step="any" class="input mono-input" id="f-lat" placeholder="48.8566">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Longitude</label>
+            <input type="number" step="any" class="input mono-input" id="f-lng" placeholder="2.3522">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Client / Maître d'ouvrage</label>
+            <input type="text" class="input" id="f-client" placeholder="Nom du client">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Chargé d'affaire</label>
+            <input type="text" class="input" id="f-ca" placeholder="Nom">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Date début</label>
+            <input type="date" class="input" id="f-start-date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Date livraison prévue</label>
+            <input type="date" class="input" id="f-end-date">
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeAffaireModal()">Annuler</button>
+      <button class="btn" onclick="saveAffaire()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal chapitre -->
+<div class="modal-overlay" id="chapter-modal">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-head">
+      <h3 id="chapter-modal-title">Nouveau chapitre</h3>
+      <button class="modal-close" onclick="closeChapterModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Titre du chapitre *</label>
+        <input type="text" class="input" id="ch-title" placeholder="Ex: Programmation automate">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Icône</label>
+        <div class="icon-grid" id="icon-grid"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeChapterModal()">Annuler</button>
+      <button class="btn" onclick="saveChapter()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ ÉTAT ============
+let affaires = [];
+let activeId = null;
+let map = null;
+let editingId = null;
+let editingChapterId = null;
+let selectedIcon = '⚙️';
+let expandedChapters = {};
+
+const CHAPTER_ICONS = ['⚙️','🔧','💻','📡','🖥️','🔌','⚡','📊','📋','🎛️','🛠️','🧰','🔩','📐','📝','✅','🔬','🧪','🔗','📁','🚦','🗄️','🧮','🔎'];
+
+const DEFAULT_CHAPTERS = [
+  { title: 'Analyse fonctionnelle', icon: '📋' },
+  { title: 'Programmation automate', icon: '💻' },
+  { title: 'Paramétrage superviseur', icon: '🖥️' },
+  { title: 'Intégration bus terrain', icon: '📡' },
+  { title: 'Raccordement & câblage', icon: '🔌' },
+  { title: 'Mise au point sur site', icon: '🔧' },
+  { title: 'Recette & PV', icon: '✅' },
+];
+
+// Modèles suggérés par marque
+const MODEL_SUGGESTIONS = {
+  'Schneider Electric': ['Modicon M340', 'Modicon M580', 'Modicon M221', 'Modicon M241', 'Modicon M251', 'TAC Xenta 911', 'SmartX AS-P', 'SmartX AS-B'],
+  'Siemens': ['S7-1200', 'S7-1500', 'S7-300', 'S7-400', 'Desigo PXC3', 'Desigo PXC4', 'Desigo PXC5', 'LOGO!', 'PXC100-E.D'],
+  'Wago': ['PFC200', 'PFC100', '750-8212', '750-8216', '750-8217', 'Touch Panel 600'],
+  'Beckhoff': ['CX5130', 'CX5140', 'CX9020', 'CX8190', 'C6015'],
+  'Trend Controls': ['IQ4E', 'IQ4NC', 'IQVISION', 'IQECO', 'IQL'],
+  'Distech Controls': ['ECB-600', 'ECB-PTU', 'ECLYPSE APEX', 'ECLYPSE Connect', 'EC-BOS'],
+  'Johnson Controls': ['FX-PCA', 'FX-PCG', 'Metasys NAE', 'Metasys NCE', 'Metasys SNC'],
+  'Sauter': ['modu525', 'modu612', 'EY-modulo 5', 'ecos504', 'ecos505'],
+  'Honeywell': ['ComfortPoint CP-IPC', 'WEBs-N4', 'Excel Web II', 'Spyder'],
+  'Delta Controls': ['eBCON', 'DSC-1616E', 'DSM-RTR', 'O3-DIN-24'],
+  'ABB': ['AC500', 'AC500-eCo', 'AC500-XC', 'AC500-S'],
+  'Priva': ['Blue ID C4', 'Blue ID E-line', 'Priva TC Modular', 'Priva Compri HX'],
+  'Regin': ['Corrigo E', 'EXOcompact', 'EXOflex', 'Optigo'],
+  'Carel': ['c.pCO', 'pCO5+', 'pCO5 compact', 'µC3', 'MasterCella'],
+  'Belimo': ['Energy Valve', 'PRCA', 'PKCA'],
+  'Loytec': ['LINX-151', 'LINX-202', 'LIOB-584', 'LIOB-100'],
+  'Saia Burgess': ['PCD3.M5', 'PCD3.M6', 'PCD1.M2', 'PCD2.M5'],
+};
+
+// ============ STORAGE ============
+async function loadData() {
+  try {
+    const raw = localStorage.getItem('autorem-data');
+    if (raw) {
+      const data = JSON.parse(raw);
+      affaires = data.affaires || [];
+      if (affaires.length > 0) activeId = affaires[0].id;
+      return;
+    }
+  } catch(e) {}
+
+  // Exemple par défaut
+  affaires = [{
+    id: Date.now(),
+    ref: 'GTB-2026-042',
+    name: 'Tour Alpha - Rénovation GTB',
+    siteType: 'Tertiaire',
+    address: '25 rue de la Défense, 92400 Courbevoie',
+    lat: 48.8924,
+    lng: 2.2403,
+    status: 'programmation',
+    brand: 'Schneider Electric',
+    model: 'Modicon M580',
+    software: 'EcoStruxure Control Expert',
+    firmware: 'v15.2',
+    supervisor: 'EcoStruxure Building Operation',
+    protocols: 'BACnet IP, Modbus RTU, KNX',
+    points: 480,
+    ip: '192.168.10.50',
+    remote: 'VPN',
+    plcCount: 3,
+    client: 'Foncière Alpha',
+    ca: 'Julien Martin',
+    startDate: '2026-01-10',
+    endDate: '2026-06-30',
+    createdAt: new Date().toISOString(),
+    chapters: [
+      {
+        id: 1001, title: 'Analyse fonctionnelle', icon: '📋',
+        tasks: [
+          { id: 1, text: 'Réception CCTP et plans CVC', done: true, date: '2026-01-15', priority: 'haute' },
+          { id: 2, text: 'Rédaction analyse fonctionnelle CTA', done: true, date: '2026-01-25', priority: 'haute' },
+          { id: 3, text: 'Validation AF par MOE', done: false, date: '2026-04-20', priority: 'haute' },
+        ],
+        comments: [
+          { id: 101, date: '2026-01-22T14:30:00Z', text: 'Points de consigne validés avec le bureau d\'étude. 6 CTA sur le site, 3 avec récupération d\'énergie.' },
+        ],
+      },
+      {
+        id: 1002, title: 'Programmation automate', icon: '💻',
+        tasks: [
+          { id: 4, text: 'Configuration hardware M580', done: true, date: '2026-02-05', priority: 'haute' },
+          { id: 5, text: 'Développement blocs CTA standards', done: true, date: '2026-02-20', priority: 'haute' },
+          { id: 6, text: 'Développement régulation cascade chaufferie', done: false, date: '2026-04-25', priority: 'haute' },
+          { id: 7, text: 'Programmation horloges et délestage', done: false, date: '2026-05-02', priority: 'moyenne' },
+        ],
+        comments: [
+          { id: 102, date: '2026-02-18T10:15:00Z', text: 'Bloc CTA v2.3 finalisé avec gestion free-cooling et free-chilling. Testé en simulation, OK.' },
+        ],
+      },
+      {
+        id: 1003, title: 'Paramétrage superviseur', icon: '🖥️',
+        tasks: [
+          { id: 8, text: 'Import BACnet points (480 pts)', done: false, date: '2026-05-10', priority: 'haute' },
+          { id: 9, text: 'Création synoptiques CTA', done: false, date: '2026-05-15', priority: 'moyenne' },
+          { id: 10, text: 'Paramétrage alarmes et consignation', done: false, date: '2026-05-20', priority: 'moyenne' },
+        ],
+        comments: [],
+      },
+      {
+        id: 1004, title: 'Mise au point sur site', icon: '🔧',
+        tasks: [
+          { id: 11, text: 'Forçage sorties TOR + vérification actionneurs', done: false, priority: 'haute' },
+          { id: 12, text: 'Calibration sondes analogiques', done: false, priority: 'moyenne' },
+          { id: 13, text: 'Tests régulation en charge', done: false, priority: 'haute' },
+        ],
+        comments: [],
+      },
+    ],
+  }];
+  activeId = affaires[0].id;
+  saveData();
+}
+
+async function saveData() {
+  try { localStorage.setItem('autorem-data', JSON.stringify({ affaires })); }
+  catch(e) { toast('Erreur de sauvegarde', 'error'); }
+}
+
+// ============ UI HELPERS ============
+function toast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function getProgress(aff) {
+  const allTasks = (aff.chapters || []).flatMap(c => c.tasks || []);
+  if (!allTasks.length) return 0;
+  return Math.round((allTasks.filter(t => t.done).length / allTasks.length) * 100);
+}
+
+function getChapterProgress(ch) {
+  if (!ch.tasks || !ch.tasks.length) return 0;
+  return Math.round((ch.tasks.filter(t => t.done).length / ch.tasks.length) * 100);
+}
+
+function isChapterExpanded(affId, chapterId) {
+  return expandedChapters[affId] && expandedChapters[affId].has(chapterId);
+}
+
+function toggleChapter(affId, chapterId) {
+  if (!expandedChapters[affId]) expandedChapters[affId] = new Set();
+  if (expandedChapters[affId].has(chapterId)) {
+    expandedChapters[affId].delete(chapterId);
+  } else {
+    expandedChapters[affId].add(chapterId);
+  }
+  renderDetail();
+}
+
+function updateModelOptions() {
+  const brand = document.getElementById('f-brand').value;
+  const datalist = document.getElementById('model-suggestions');
+  const models = MODEL_SUGGESTIONS[brand] || [];
+  datalist.innerHTML = models.map(m => `<option value="${escapeHtml(m)}">`).join('');
+}
+
+// ============ RENDER ============
+function renderSidebar() {
+  document.getElementById('count-badge').textContent = affaires.length;
+  const list = document.getElementById('affaire-list');
+  if (!affaires.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text-faint);font-size:12px;padding:30px 0;">Aucune affaire</div>';
+    return;
+  }
+  list.innerHTML = affaires.map(aff => {
+    const prog = getProgress(aff);
+    const allTasks = (aff.chapters || []).flatMap(c => c.tasks || []);
+    return `
+      <div class="affaire-item ${aff.id === activeId ? 'active' : ''}" onclick="selectAffaire(${aff.id})">
+        <div class="aff-head">
+          <div style="min-width:0;flex:1;">
+            <div class="aff-ref">${escapeHtml(aff.ref) || '—'}</div>
+            <div class="aff-name">${escapeHtml(aff.name)}</div>
+          </div>
+          <span class="status-pill status-${aff.status}">${aff.status.replace(/-/g, ' ')}</span>
+        </div>
+        <div class="aff-automate"><span class="dot"></span>${escapeHtml(aff.brand || '—')}${aff.model ? ' · ' + escapeHtml(aff.model) : ''}</div>
+        <div class="aff-loc">📍 ${escapeHtml(aff.address || '')}</div>
+        <div class="progress-track"><div class="progress-fill" style="width:${prog}%"></div></div>
+        <div class="aff-foot">
+          <span class="progress-pct">${prog}%</span>
+          <span style="font-family:'JetBrains Mono';font-size:10px;color:var(--text-faint);">${allTasks.filter(t => t.done).length}/${allTasks.length} · ${aff.points || 0} pts</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderDetail() {
+  const container = document.getElementById('detail-view');
+  const aff = affaires.find(a => a.id === activeId);
+  if (!aff) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+        <h2 style="font-size:22px;font-weight:600;margin-bottom:8px;">Aucune affaire sélectionnée</h2>
+      </div>`;
+    return;
+  }
+
+  const prog = getProgress(aff);
+  const allTasks = (aff.chapters || []).flatMap(c => c.tasks || []);
+  const totalTasks = allTasks.length;
+  const doneTasks = allTasks.filter(t => t.done).length;
+  const overdue = allTasks.filter(t => t.date && !t.done && new Date(t.date) < new Date(new Date().toDateString())).length;
+  const totalComments = (aff.chapters || []).flatMap(c => c.comments || []).length;
+  const daysToEnd = aff.endDate ? Math.ceil((new Date(aff.endDate) - new Date()) / 86400000) : null;
+
+  const protocols = (aff.protocols || '').split(',').map(s => s.trim()).filter(Boolean);
+
+  container.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-meta-top">
+        <div>
+          <div class="detail-ref">${escapeHtml(aff.ref) || '—'} · ${aff.status.replace(/-/g, ' ')}</div>
+          <h2>${escapeHtml(aff.name)}</h2>
+          <div class="detail-automate-banner">
+            <span style="font-weight:700;">⚙ ${escapeHtml(aff.brand || '—')}</span>
+            ${aff.model ? `<span style="opacity:0.7;">/</span><span>${escapeHtml(aff.model)}</span>` : ''}
+            ${aff.firmware ? `<span style="opacity:0.5;">· FW ${escapeHtml(aff.firmware)}</span>` : ''}
+          </div>
+        </div>
+        <div class="action-buttons">
+          <button class="btn btn-ghost btn-sm" onclick="editAffaire(${aff.id})">✎ Modifier</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteAffaire(${aff.id})" style="color:var(--danger);border-color:rgba(239,68,68,0.3);">🗑 Supprimer</button>
+        </div>
+      </div>
+      <div class="meta-grid">
+        <div class="meta-item"><div class="label">Type de site</div><div class="value">${escapeHtml(aff.siteType) || '—'}</div></div>
+        <div class="meta-item"><div class="label">Atelier logiciel</div><div class="value mono">${escapeHtml(aff.software) || '—'}</div></div>
+        <div class="meta-item"><div class="label">Superviseur</div><div class="value">${escapeHtml(aff.supervisor) || '—'}</div></div>
+        <div class="meta-item"><div class="label">Points I/O</div><div class="value mono">${aff.points || '—'}</div></div>
+        <div class="meta-item"><div class="label">Nb automates</div><div class="value mono">${aff.plcCount || '—'}</div></div>
+        <div class="meta-item"><div class="label">IP automate</div><div class="value mono">${escapeHtml(aff.ip) || '—'}</div></div>
+        <div class="meta-item"><div class="label">Accès distant</div><div class="value">${escapeHtml(aff.remote) || '—'}</div></div>
+        <div class="meta-item"><div class="label">Client</div><div class="value">${escapeHtml(aff.client) || '—'}</div></div>
+        <div class="meta-item"><div class="label">Chargé d'affaire</div><div class="value">${escapeHtml(aff.ca) || '—'}</div></div>
+      </div>
+      ${protocols.length ? `
+      <div style="margin-top:16px;position:relative;z-index:1;">
+        <div class="form-label" style="margin-bottom:8px;">Protocoles bus</div>
+        <div>${protocols.map(p => `<span class="bus-tag">⇆ ${escapeHtml(p)}</span>`).join('')}</div>
+      </div>` : ''}
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Progression</div>
+        <div class="kpi-value primary">${prog}%</div>
+        <div class="kpi-sub">${doneTasks}/${totalTasks} tâches · ${(aff.chapters || []).length} chapitres</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">En retard</div>
+        <div class="kpi-value ${overdue > 0 ? 'danger' : 'success'}">${overdue}</div>
+        <div class="kpi-sub">${overdue > 0 ? 'tâches dépassées' : 'aucun retard'}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Livraison</div>
+        <div class="kpi-value ${daysToEnd !== null && daysToEnd < 30 ? 'warn' : ''}">${daysToEnd !== null ? (daysToEnd > 0 ? 'J-' + daysToEnd : 'DÉPASSÉ') : '—'}</div>
+        <div class="kpi-sub">${aff.endDate ? new Date(aff.endDate).toLocaleDateString('fr-FR') : 'non planifié'}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Commentaires</div>
+        <div class="kpi-value accent">${totalComments}</div>
+        <div class="kpi-sub">notes techniques</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h3>📍 Localisation du site</h3>
+        ${aff.lat && aff.lng ? `<a href="https://www.google.com/maps?q=${aff.lat},${aff.lng}" target="_blank" class="btn btn-ghost btn-sm" style="text-decoration:none;">Ouvrir Google Maps →</a>` : ''}
+      </div>
+      <div class="panel-body" style="padding:0;">
+        <div id="map"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h3>📚 Chapitres de l'affaire</h3>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-ghost btn-sm" onclick="loadDefaultChapters()" title="Charger les chapitres types GTB">⚡ Types GTB</button>
+          <button class="btn btn-sm" onclick="openChapterModal()">＋ Chapitre</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        ${(aff.chapters || []).length === 0 ? `
+          <div style="text-align:center;padding:40px 20px;color:var(--text-faint);">
+            <div style="font-size:48px;margin-bottom:12px;opacity:0.3;">📚</div>
+            <div style="font-size:14px;margin-bottom:14px;">Aucun chapitre créé</div>
+            <button class="btn btn-sm" onclick="loadDefaultChapters()">⚡ Charger chapitres GTB types</button>
+          </div>
+        ` : (aff.chapters || []).map(ch => renderChapter(aff, ch)).join('')}
+      </div>
+    </div>
+  `;
+
+  setTimeout(() => initMap(aff), 50);
+}
+
+function renderChapter(aff, ch) {
+  const expanded = isChapterExpanded(aff.id, ch.id);
+  const prog = getChapterProgress(ch);
+  const doneTasks = (ch.tasks || []).filter(t => t.done).length;
+  const totalTasks = (ch.tasks || []).length;
+  const commentCount = (ch.comments || []).length;
+
+  return `
+    <div class="chapter ${expanded ? 'expanded' : ''}">
+      <div class="chapter-head" onclick="toggleChapter(${aff.id}, ${ch.id})">
+        <svg class="chapter-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        <div class="chapter-info">
+          <div class="chapter-title-row">
+            <span class="chapter-icon">${ch.icon || '📋'}</span>
+            <span class="chapter-title">${escapeHtml(ch.title)}</span>
+          </div>
+          <div class="chapter-stats">
+            <div class="chapter-progress"><div class="chapter-progress-fill" style="width:${prog}%"></div></div>
+            <span class="chapter-count">${doneTasks}/${totalTasks} · 💬 ${commentCount}</span>
+          </div>
+        </div>
+        <div class="chapter-actions" onclick="event.stopPropagation()">
+          <button class="chapter-action-btn" onclick="editChapter(${ch.id})" title="Renommer">✎</button>
+          <button class="chapter-action-btn danger" onclick="deleteChapter(${ch.id})" title="Supprimer">🗑</button>
+        </div>
+      </div>
+      <div class="chapter-body">
+
+        <div class="chapter-section">
+          <div class="chapter-section-title">✓ Tâches</div>
+          <div class="task-add-row">
+            <input type="text" class="input" id="task-text-${ch.id}" placeholder="Nouvelle tâche..." onkeydown="if(event.key==='Enter')addTask(${ch.id})" style="flex:1;">
+            <input type="date" class="input" id="task-date-${ch.id}" style="max-width:150px;">
+            <select class="select" id="task-priority-${ch.id}" style="max-width:110px;">
+              <option value="basse">Basse</option>
+              <option value="moyenne" selected>Moyenne</option>
+              <option value="haute">Haute</option>
+            </select>
+            <button class="btn" onclick="addTask(${ch.id})">＋</button>
+          </div>
+          ${(ch.tasks || []).length === 0 ? '<div style="color:var(--text-faint);font-size:12px;padding:8px 0;">Aucune tâche</div>' : (ch.tasks || []).map(t => renderTask(ch.id, t)).join('')}
+        </div>
+
+        <div class="chapter-section">
+          <div class="chapter-section-title">💬 Commentaires & notes techniques</div>
+          <div class="comment-add">
+            <textarea class="textarea" id="comment-text-${ch.id}" placeholder="Note technique, paramètre, observation, config réseau, mot de passe API..."></textarea>
+            <button class="btn btn-sm" onclick="addComment(${ch.id})" style="align-self:flex-start;">＋ Ajouter le commentaire</button>
+          </div>
+          <div style="margin-top:10px;">
+            ${(ch.comments || []).length === 0 ? '<div style="color:var(--text-faint);font-size:12px;padding:6px 0;">Aucun commentaire</div>' : (ch.comments || []).slice().reverse().map(c => `
+              <div class="comment">
+                <div class="comment-head">
+                  <span class="comment-date">${new Date(c.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                  <button class="task-delete" onclick="deleteComment(${ch.id}, ${c.id})" title="Supprimer">✕</button>
+                </div>
+                <div class="comment-text">${escapeHtml(c.text)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+function renderTask(chapterId, t) {
+  const overdue = t.date && !t.done && new Date(t.date) < new Date(new Date().toDateString());
+  const priorityIcon = { haute: '🔴', moyenne: '🟡', basse: '🔵' }[t.priority || 'moyenne'];
+  return `
+    <div class="task ${t.done ? 'done' : ''}">
+      <div class="task-check" onclick="toggleTask(${chapterId}, ${t.id})">${t.done ? '✓' : ''}</div>
+      <div class="task-body">
+        <div class="task-text">${escapeHtml(t.text)}</div>
+        <div class="task-meta">
+          ${t.date ? `<div class="task-meta-item ${overdue ? 'overdue' : ''}">🗓 ${new Date(t.date).toLocaleDateString('fr-FR')}${overdue ? ' · RETARD' : ''}</div>` : ''}
+          <div class="task-meta-item">${priorityIcon} ${t.priority || 'moyenne'}</div>
+        </div>
+      </div>
+      <button class="task-delete" onclick="deleteTask(${chapterId}, ${t.id})">✕</button>
+    </div>
+  `;
+}
+
+function initMap(aff) {
+  const mapEl = document.getElementById('map');
+  if (!mapEl) return;
+  if (map) { map.remove(); map = null; }
+
+  const center = (aff.lat && aff.lng) ? [aff.lat, aff.lng] : [46.603354, 1.888334];
+  map = L.map('map', { zoomControl: true, scrollWheelZoom: false }).setView(center, aff.lat ? 15 : 6);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO',
+    maxZoom: 19,
+  }).addTo(map);
+
+  affaires.forEach(a => {
+    if (a.lat && a.lng) {
+      const prog = getProgress(a);
+      const isActive = a.id === activeId;
+      const color = isActive ? '#2563eb' : (a.status === 'sav' ? '#ef4444' : a.status === 'livre' ? '#10b981' : a.status === 'mise-au-point' ? '#eab308' : a.status === 'etude' ? '#10b981' : '#3b82f6');
+      const icon = L.divIcon({
+        className: 'custom-marker',
+        html: `<div style="background:${color};width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.5);border:2px solid #0a0f1a;"><span style="transform:rotate(45deg);color:white;font-weight:700;font-size:11px;font-family:'JetBrains Mono';">${prog}</span></div>`,
+        iconSize: [34, 34],
+        iconAnchor: [17, 34],
+      });
+      const m = L.marker([a.lat, a.lng], { icon }).addTo(map);
+      m.bindPopup(`
+        <div style="font-family:'JetBrains Mono';font-size:10px;color:#2563eb;letter-spacing:1px;">${escapeHtml(a.ref) || '—'}</div>
+        <div style="font-size:15px;font-weight:600;margin:4px 0;">${escapeHtml(a.name)}</div>
+        <div style="font-size:11px;color:#94a3b8;margin-bottom:4px;">${escapeHtml(a.brand || '')} ${escapeHtml(a.model || '')}</div>
+        <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">${escapeHtml(a.address || '')}</div>
+        <div style="font-family:'JetBrains Mono';font-size:10px;color:#2563eb;">Avancement: ${prog}%</div>
+      `);
+      m.on('click', () => selectAffaire(a.id));
+    }
+  });
+}
+
+// ============ ACTIONS ============
+function selectAffaire(id) {
+  activeId = id;
+  renderSidebar();
+  renderDetail();
+}
+
+function openAffaireModal() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = 'Nouvelle affaire GTB';
+  ['f-name','f-ref','f-addr','f-lat','f-lng','f-model','f-software','f-firmware','f-supervisor','f-protocols','f-points','f-ip','f-plc-count','f-client','f-ca','f-start-date','f-end-date'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-status').value = 'programmation';
+  document.getElementById('f-site-type').value = 'Tertiaire';
+  document.getElementById('f-brand').value = '';
+  document.getElementById('f-remote').value = '';
+  document.getElementById('geo-result').textContent = '';
+  updateModelOptions();
+  document.getElementById('affaire-modal').classList.add('open');
+}
+
+function editAffaire(id) {
+  const aff = affaires.find(a => a.id === id);
+  if (!aff) return;
+  editingId = id;
+  document.getElementById('modal-title').textContent = "Modifier l'affaire";
+  const setVal = (field, val) => document.getElementById(field).value = val || '';
+  setVal('f-name', aff.name);
+  setVal('f-ref', aff.ref);
+  setVal('f-status', aff.status || 'programmation');
+  setVal('f-site-type', aff.siteType || 'Tertiaire');
+  setVal('f-brand', aff.brand);
+  setVal('f-model', aff.model);
+  setVal('f-software', aff.software);
+  setVal('f-firmware', aff.firmware);
+  setVal('f-supervisor', aff.supervisor);
+  setVal('f-protocols', aff.protocols);
+  setVal('f-points', aff.points);
+  setVal('f-ip', aff.ip);
+  setVal('f-remote', aff.remote);
+  setVal('f-plc-count', aff.plcCount);
+  setVal('f-addr', aff.address);
+  setVal('f-lat', aff.lat);
+  setVal('f-lng', aff.lng);
+  setVal('f-client', aff.client);
+  setVal('f-ca', aff.ca);
+  setVal('f-start-date', aff.startDate);
+  setVal('f-end-date', aff.endDate);
+  updateModelOptions();
+  document.getElementById('affaire-modal').classList.add('open');
+}
+
+function closeAffaireModal() {
+  document.getElementById('affaire-modal').classList.remove('open');
+}
+
+function saveAffaire() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { toast('Le nom est obligatoire', 'error'); return; }
+  const data = {
+    name,
+    ref: document.getElementById('f-ref').value.trim(),
+    status: document.getElementById('f-status').value,
+    siteType: document.getElementById('f-site-type').value,
+    brand: document.getElementById('f-brand').value,
+    model: document.getElementById('f-model').value.trim(),
+    software: document.getElementById('f-software').value.trim(),
+    firmware: document.getElementById('f-firmware').value.trim(),
+    supervisor: document.getElementById('f-supervisor').value.trim(),
+    protocols: document.getElementById('f-protocols').value.trim(),
+    points: parseInt(document.getElementById('f-points').value) || null,
+    ip: document.getElementById('f-ip').value.trim(),
+    remote: document.getElementById('f-remote').value,
+    plcCount: parseInt(document.getElementById('f-plc-count').value) || null,
+    address: document.getElementById('f-addr').value.trim(),
+    lat: parseFloat(document.getElementById('f-lat').value) || null,
+    lng: parseFloat(document.getElementById('f-lng').value) || null,
+    client: document.getElementById('f-client').value.trim(),
+    ca: document.getElementById('f-ca').value.trim(),
+    startDate: document.getElementById('f-start-date').value,
+    endDate: document.getElementById('f-end-date').value,
+  };
+  if (editingId) {
+    const aff = affaires.find(a => a.id === editingId);
+    Object.assign(aff, data);
+    toast('Affaire modifiée');
+  } else {
+    affaires.push({ ...data, id: Date.now(), chapters: [], createdAt: new Date().toISOString() });
+    activeId = affaires[affaires.length - 1].id;
+    toast('Affaire créée');
+  }
+  saveData();
+  closeAffaireModal();
+  renderSidebar();
+  renderDetail();
+}
+
+function deleteAffaire(id) {
+  if (!confirm('Supprimer cette affaire et toutes ses données ?')) return;
+  affaires = affaires.filter(a => a.id !== id);
+  if (activeId === id) activeId = affaires.length ? affaires[0].id : null;
+  saveData();
+  renderSidebar();
+  renderDetail();
+  toast('Affaire supprimée');
+}
+
+function openChapterModal() {
+  editingChapterId = null;
+  selectedIcon = '⚙️';
+  document.getElementById('chapter-modal-title').textContent = 'Nouveau chapitre';
+  document.getElementById('ch-title').value = '';
+  renderIconGrid();
+  document.getElementById('chapter-modal').classList.add('open');
+}
+
+function editChapter(id) {
+  const aff = affaires.find(a => a.id === activeId);
+  const ch = (aff.chapters || []).find(c => c.id === id);
+  if (!ch) return;
+  editingChapterId = id;
+  selectedIcon = ch.icon || '⚙️';
+  document.getElementById('chapter-modal-title').textContent = 'Modifier le chapitre';
+  document.getElementById('ch-title').value = ch.title;
+  renderIconGrid();
+  document.getElementById('chapter-modal').classList.add('open');
+}
+
+function closeChapterModal() {
+  document.getElementById('chapter-modal').classList.remove('open');
+}
+
+function renderIconGrid() {
+  document.getElementById('icon-grid').innerHTML = CHAPTER_ICONS.map(icon => `
+    <div class="icon-option ${icon === selectedIcon ? 'selected' : ''}" onclick="pickIcon('${icon}')">${icon}</div>
+  `).join('');
+}
+
+function pickIcon(icon) {
+  selectedIcon = icon;
+  renderIconGrid();
+}
+
+function saveChapter() {
+  const title = document.getElementById('ch-title').value.trim();
+  if (!title) { toast('Le titre est obligatoire', 'error'); return; }
+  const aff = affaires.find(a => a.id === activeId);
+  if (!aff.chapters) aff.chapters = [];
+  if (editingChapterId) {
+    const ch = aff.chapters.find(c => c.id === editingChapterId);
+    ch.title = title;
+    ch.icon = selectedIcon;
+    toast('Chapitre modifié');
+  } else {
+    const newCh = { id: Date.now(), title, icon: selectedIcon, tasks: [], comments: [] };
+    aff.chapters.push(newCh);
+    if (!expandedChapters[aff.id]) expandedChapters[aff.id] = new Set();
+    expandedChapters[aff.id].add(newCh.id);
+    toast('Chapitre créé');
+  }
+  saveData();
+  closeChapterModal();
+  renderSidebar();
+  renderDetail();
+}
+
+function deleteChapter(id) {
+  if (!confirm('Supprimer ce chapitre avec ses tâches et commentaires ?')) return;
+  const aff = affaires.find(a => a.id === activeId);
+  aff.chapters = aff.chapters.filter(c => c.id !== id);
+  saveData();
+  renderSidebar();
+  renderDetail();
+  toast('Chapitre supprimé');
+}
+
+function loadDefaultChapters() {
+  const aff = affaires.find(a => a.id === activeId);
+  if (!aff) return;
+  if ((aff.chapters || []).length > 0 && !confirm('Ajouter les chapitres GTB types aux chapitres existants ?')) return;
+  if (!aff.chapters) aff.chapters = [];
+  DEFAULT_CHAPTERS.forEach(tpl => {
+    aff.chapters.push({ id: Date.now() + Math.random(), title: tpl.title, icon: tpl.icon, tasks: [], comments: [] });
+  });
+  saveData();
+  renderSidebar();
+  renderDetail();
+  toast('Chapitres GTB types ajoutés');
+}
+
+function addTask(chapterId) {
+  const aff = affaires.find(a => a.id === activeId);
+  const ch = aff.chapters.find(c => c.id === chapterId);
+  const text = document.getElementById(`task-text-${chapterId}`).value.trim();
+  if (!text) return;
+  const date = document.getElementById(`task-date-${chapterId}`).value;
+  const priority = document.getElementById(`task-priority-${chapterId}`).value;
+  if (!ch.tasks) ch.tasks = [];
+  ch.tasks.push({ id: Date.now(), text, done: false, date, priority });
+  saveData();
+  renderSidebar();
+  renderDetail();
+}
+
+function toggleTask(chapterId, taskId) {
+  const aff = affaires.find(a => a.id === activeId);
+  const ch = aff.chapters.find(c => c.id === chapterId);
+  const t = ch.tasks.find(x => x.id === taskId);
+  if (t) { t.done = !t.done; saveData(); renderSidebar(); renderDetail(); }
+}
+
+function deleteTask(chapterId, taskId) {
+  const aff = affaires.find(a => a.id === activeId);
+  const ch = aff.chapters.find(c => c.id === chapterId);
+  ch.tasks = ch.tasks.filter(t => t.id !== taskId);
+  saveData();
+  renderSidebar();
+  renderDetail();
+}
+
+function addComment(chapterId) {
+  const aff = affaires.find(a => a.id === activeId);
+  const ch = aff.chapters.find(c => c.id === chapterId);
+  const text = document.getElementById(`comment-text-${chapterId}`).value.trim();
+  if (!text) { toast('Le commentaire est vide', 'error'); return; }
+  if (!ch.comments) ch.comments = [];
+  ch.comments.push({ id: Date.now(), date: new Date().toISOString(), text });
+  saveData();
+  renderDetail();
+  toast('Commentaire ajouté');
+}
+
+function deleteComment(chapterId, commentId) {
+  if (!confirm('Supprimer ce commentaire ?')) return;
+  const aff = affaires.find(a => a.id === activeId);
+  const ch = aff.chapters.find(c => c.id === chapterId);
+  ch.comments = ch.comments.filter(c => c.id !== commentId);
+  saveData();
+  renderDetail();
+}
+
+async function geocodeAddress() {
+  const addr = document.getElementById('f-addr').value.trim();
+  if (!addr) { toast('Entre une adresse', 'error'); return; }
+  const res = document.getElementById('geo-result');
+  res.textContent = '⏳ Recherche...';
+  res.style.color = 'var(--text-dim)';
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(addr)}`);
+    const data = await r.json();
+    if (data && data.length) {
+      document.getElementById('f-lat').value = parseFloat(data[0].lat).toFixed(6);
+      document.getElementById('f-lng').value = parseFloat(data[0].lon).toFixed(6);
+      res.textContent = '✓ Coordonnées trouvées';
+      res.style.color = 'var(--success)';
+    } else {
+      res.textContent = '✕ Adresse introuvable';
+      res.style.color = 'var(--danger)';
+    }
+  } catch(e) {
+    res.textContent = '✕ Erreur réseau';
+    res.style.color = 'var(--danger)';
+  }
+}
+
+function exportICS() {
+  const events = [];
+  affaires.forEach(aff => {
+    (aff.chapters || []).forEach(ch => {
+      (ch.tasks || []).forEach(t => {
+        if (t.date && !t.done) {
+          const d = t.date.replace(/-/g, '');
+          events.push([
+            'BEGIN:VEVENT',
+            `UID:${t.id}@autorem`,
+            `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
+            `DTSTART;VALUE=DATE:${d}`,
+            `DTEND;VALUE=DATE:${d}`,
+            `SUMMARY:[${aff.ref || aff.name}] ${ch.title} - ${t.text}`,
+            `LOCATION:${aff.address || ''}`,
+            `DESCRIPTION:Affaire: ${aff.name}\\nAutomate: ${aff.brand} ${aff.model || ''}\\nChapitre: ${ch.title}\\nPriorité: ${t.priority}`,
+            'END:VEVENT',
+          ].join('\r\n'));
+        }
+      });
+    });
+    if (aff.endDate) {
+      const d = aff.endDate.replace(/-/g, '');
+      events.push([
+        'BEGIN:VEVENT',
+        `UID:end-${aff.id}@autorem`,
+        `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
+        `DTSTART;VALUE=DATE:${d}`,
+        `DTEND;VALUE=DATE:${d}`,
+        `SUMMARY:🚩 Livraison ${aff.name}`,
+        `LOCATION:${aff.address || ''}`,
+        'END:VEVENT',
+      ].join('\r\n'));
+    }
+  });
+  if (!events.length) { toast('Aucune échéance à exporter', 'error'); return; }
+  const ics = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Autorem//FR','CALSCALE:GREGORIAN',...events,'END:VCALENDAR'].join('\r\n');
+  download(ics, `autorem-${new Date().toISOString().split('T')[0]}.ics`, 'text/calendar');
+  toast(`${events.length} événement(s) exporté(s)`);
+}
+
+function exportJSON() {
+  const data = JSON.stringify({ affaires, exportedAt: new Date().toISOString(), version: 4, app: 'Autorem' }, null, 2);
+  download(data, `autorem-sauvegarde-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+  toast('Sauvegarde téléchargée');
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      const imported = data.affaires || data.installations || data.chantiers;
+      if (imported && Array.isArray(imported)) {
+        if (confirm(`Importer ${imported.length} affaire(s) ? Remplace les données actuelles.`)) {
+          affaires = imported;
+          activeId = affaires.length ? affaires[0].id : null;
+          saveData();
+          renderSidebar();
+          renderDetail();
+          toast('Import réussi');
+        }
+      } else toast('Fichier invalide', 'error');
+    } catch(err) { toast('Erreur de lecture', 'error'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function download(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+(async () => {
+  await loadData();
+  if (activeId && !expandedChapters[activeId]) {
+    expandedChapters[activeId] = new Set();
+    const aff = affaires.find(a => a.id === activeId);
+    if (aff && aff.chapters && aff.chapters.length > 0) {
+      expandedChapters[activeId].add(aff.chapters[0].id);
+    }
+  }
+  renderSidebar();
+  renderDetail();
+})();
+</script>
+
+</body>
+</html>
