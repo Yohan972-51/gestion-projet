@@ -1305,9 +1305,9 @@ const MODEL_SUGGESTIONS = {
 // ============ STORAGE ============
 async function loadData() {
   try {
-    const res = await window.storage.get('autorem-data');
-    if (res && res.value) {
-      const data = JSON.parse(res.value);
+    const raw = localStorage.getItem('autorem-data');
+    if (raw) {
+      const data = JSON.parse(raw);
       affaires = data.affaires || [];
       if (affaires.length > 0) activeId = affaires[0].id;
       return;
@@ -1384,11 +1384,11 @@ async function loadData() {
     ],
   }];
   activeId = affaires[0].id;
-  await saveData();
+  saveData();
 }
 
 async function saveData() {
-  try { await window.storage.set('autorem-data', JSON.stringify({ affaires })); }
+  try { localStorage.setItem('autorem-data', JSON.stringify({ affaires })); }
   catch(e) { toast('Erreur de sauvegarde', 'error'); }
 }
 
