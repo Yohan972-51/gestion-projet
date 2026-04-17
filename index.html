@@ -997,6 +997,60 @@
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
 
+  /* Search results */
+  .search-result-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.1s;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .search-result-item:last-child { border-bottom: none; }
+
+  .search-result-item:hover, .search-result-item.highlighted {
+    background: var(--primary-soft);
+  }
+
+  .search-result-name {
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 3px;
+    color: var(--text);
+  }
+
+  .search-result-addr {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+
+  .search-result-type {
+    display: inline-block;
+    font-family: 'JetBrains Mono';
+    font-size: 9px;
+    color: var(--primary);
+    background: var(--primary-soft);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .search-loading {
+    padding: 14px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  .search-empty {
+    padding: 14px;
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 12px;
+  }
+
   /* Google Calendar status */
   .gcal-status {
     display: flex;
@@ -1236,11 +1290,21 @@
 
       <div class="form-section">
         <div class="form-section-title">Localisation & Intervenants</div>
+
+        <div class="form-group">
+          <label class="form-label">🔍 Rechercher un lieu / entreprise</label>
+          <div style="position:relative;">
+            <input type="text" class="input" id="f-search-place" placeholder="Ex: Carrefour Collégien, Leroy Merlin Torcy, Hôpital Marne-la-Vallée..." oninput="debounceSearch()" onkeydown="handleSearchKey(event)" autocomplete="off">
+            <div id="search-results" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--bg-elev);border:1px solid var(--primary);border-top:none;border-radius:0 0 8px 8px;max-height:260px;overflow-y:auto;box-shadow:0 12px 30px rgba(0,0,0,0.5);"></div>
+          </div>
+          <div style="font-size:11px;color:var(--text-faint);margin-top:6px;">Tape le nom d'une entreprise, magasin, école, hôpital, usine... et sélectionne dans la liste</div>
+        </div>
+
         <div class="form-group">
           <label class="form-label">Adresse du site *</label>
           <input type="text" class="input" id="f-addr" placeholder="25 rue de la Défense, 92400 Courbevoie">
           <div class="geo-helper">
-            <button type="button" class="btn btn-ghost btn-sm" onclick="geocodeAddress()">📍 Géolocaliser</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="geocodeAddress()">📍 Géolocaliser par adresse</button>
             <span id="geo-result"></span>
           </div>
         </div>
@@ -2087,7 +2151,7 @@ function selectAffaire(id) {
 function openAffaireModal() {
   editingId = null;
   document.getElementById('modal-title').textContent = 'Nouvelle affaire GTB';
-  ['f-name','f-ref','f-addr','f-lat','f-lng','f-model','f-software','f-firmware','f-supervisor','f-protocols','f-points','f-ip','f-plc-count','f-client','f-ca','f-start-date','f-end-date'].forEach(id => document.getElementById(id).value = '');
+  ['f-name','f-ref','f-addr','f-lat','f-lng','f-model','f-software','f-firmware','f-supervisor','f-protocols','f-points','f-ip','f-plc-count','f-client','f-ca','f-start-date','f-end-date','f-search-place'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-status').value = 'programmation';
   document.getElementById('f-site-type').value = 'Tertiaire';
   document.getElementById('f-brand').value = '';
@@ -2316,6 +2380,175 @@ function deleteComment(chapterId, commentId) {
   saveData();
   renderDetail();
 }
+
+// ============ RECHERCHE DE LIEUX ============
+let searchTimeout = null;
+let searchResults = [];
+let searchHighlight = -1;
+
+function debounceSearch() {
+  clearTimeout(searchTimeout);
+  const query = document.getElementById('f-search-place').value.trim();
+  if (query.length < 3) {
+    hideSearchResults();
+    return;
+  }
+  showSearchLoading();
+  searchTimeout = setTimeout(() => searchPlaces(query), 400);
+}
+
+async function searchPlaces(query) {
+  try {
+    // Recherche via Nominatim avec résultats détaillés
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=8&addressdetails=1&extratags=1&namedetails=1&q=${encodeURIComponent(query)}`;
+    const r = await fetch(url, {
+      headers: { 'Accept-Language': 'fr' }
+    });
+    const data = await r.json();
+    
+    if (!data || !data.length) {
+      showSearchEmpty(query);
+      return;
+    }
+
+    searchResults = data.map(item => {
+      // Extraire un nom propre si possible
+      let name = item.namedetails?.name || item.display_name.split(',')[0];
+      let type = item.type || item.class || '';
+      
+      // Traduction des types courants
+      const typeMap = {
+        'supermarket': 'Supermarché', 'shop': 'Commerce', 'office': 'Bureau',
+        'industrial': 'Industriel', 'commercial': 'Commercial', 'school': 'École',
+        'hospital': 'Hôpital', 'university': 'Université', 'hotel': 'Hôtel',
+        'retail': 'Commerce', 'warehouse': 'Entrepôt', 'mall': 'Centre commercial',
+        'apartments': 'Résidence', 'house': 'Maison', 'building': 'Bâtiment',
+        'yes': item.class || '', 'townhall': 'Mairie', 'library': 'Bibliothèque',
+        'sports_centre': 'Centre sportif', 'swimming_pool': 'Piscine',
+        'pharmacy': 'Pharmacie', 'bank': 'Banque', 'restaurant': 'Restaurant',
+        'fast_food': 'Restauration rapide', 'kindergarten': 'Crèche',
+        'clinic': 'Clinique', 'doctors': 'Cabinet médical', 'church': 'Église',
+        'place_of_worship': 'Lieu de culte', 'fuel': 'Station-service',
+        'car_repair': 'Garage auto', 'college': 'Collège/Lycée',
+        'marketplace': 'Marché', 'cinema': 'Cinéma', 'theatre': 'Théâtre',
+        'museum': 'Musée', 'community_centre': 'Centre communal',
+      };
+      type = typeMap[type] || type;
+
+      // Construire l'adresse propre
+      const addr = item.address || {};
+      const addrParts = [
+        addr.house_number, addr.road,
+        addr.postcode, addr.city || addr.town || addr.village || addr.municipality,
+      ].filter(Boolean);
+      const displayAddr = addrParts.length ? addrParts.join(' ') : item.display_name;
+
+      return {
+        name,
+        type,
+        address: displayAddr,
+        fullAddress: item.display_name,
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon),
+        osmType: item.class,
+      };
+    });
+
+    searchHighlight = -1;
+    renderSearchResults();
+  } catch(e) {
+    console.error('Erreur recherche:', e);
+    showSearchEmpty(query);
+  }
+}
+
+function renderSearchResults() {
+  const container = document.getElementById('search-results');
+  if (!searchResults.length) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'block';
+  container.innerHTML = searchResults.map((r, i) => `
+    <div class="search-result-item ${i === searchHighlight ? 'highlighted' : ''}" onclick="selectSearchResult(${i})" onmouseenter="searchHighlight=${i};renderSearchResults();">
+      <div class="search-result-name">${escapeHtml(r.name)}</div>
+      <div class="search-result-addr">📍 ${escapeHtml(r.address)}</div>
+      ${r.type ? `<span class="search-result-type">${escapeHtml(r.type)}</span>` : ''}
+    </div>
+  `).join('');
+}
+
+function selectSearchResult(index) {
+  const r = searchResults[index];
+  if (!r) return;
+
+  document.getElementById('f-addr').value = r.fullAddress;
+  document.getElementById('f-lat').value = r.lat.toFixed(6);
+  document.getElementById('f-lng').value = r.lng.toFixed(6);
+
+  // Si le champ nom est vide, on propose le nom du lieu
+  const nameField = document.getElementById('f-name');
+  if (!nameField.value.trim()) {
+    nameField.value = r.name;
+  }
+
+  // Si le champ client est vide et que c'est un commerce/entreprise, on met le nom
+  const clientField = document.getElementById('f-client');
+  if (!clientField.value.trim() && r.name) {
+    clientField.value = r.name;
+  }
+
+  hideSearchResults();
+  document.getElementById('f-search-place').value = '';
+  document.getElementById('geo-result').textContent = '✓ ' + r.name + ' localisé';
+  document.getElementById('geo-result').style.color = 'var(--success)';
+  toast(`📍 ${r.name} — coordonnées remplies`, 'success');
+}
+
+function handleSearchKey(event) {
+  const container = document.getElementById('search-results');
+  if (container.style.display === 'none') return;
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    searchHighlight = Math.min(searchHighlight + 1, searchResults.length - 1);
+    renderSearchResults();
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    searchHighlight = Math.max(searchHighlight - 1, 0);
+    renderSearchResults();
+  } else if (event.key === 'Enter') {
+    event.preventDefault();
+    if (searchHighlight >= 0) selectSearchResult(searchHighlight);
+  } else if (event.key === 'Escape') {
+    hideSearchResults();
+  }
+}
+
+function showSearchLoading() {
+  const container = document.getElementById('search-results');
+  container.style.display = 'block';
+  container.innerHTML = '<div class="search-loading">⏳ Recherche en cours...</div>';
+}
+
+function showSearchEmpty(query) {
+  const container = document.getElementById('search-results');
+  container.style.display = 'block';
+  container.innerHTML = `<div class="search-empty">Aucun résultat pour "${escapeHtml(query)}"<br><span style="font-size:10px;color:var(--text-faint);margin-top:4px;display:block;">Essaie "nom + ville" (ex: Carrefour Collégien)</span></div>`;
+}
+
+function hideSearchResults() {
+  document.getElementById('search-results').style.display = 'none';
+  searchResults = [];
+  searchHighlight = -1;
+}
+
+// Fermer les résultats si on clique ailleurs
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#f-search-place') && !e.target.closest('#search-results')) {
+    hideSearchResults();
+  }
+});
 
 async function geocodeAddress() {
   const addr = document.getElementById('f-addr').value.trim();
