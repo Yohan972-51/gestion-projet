@@ -1559,6 +1559,7 @@
     </div>
     <button class="btn btn-ghost btn-sm" onclick="openGcalSettings()" title="Configurer">⚙️</button>
     <button class="btn btn-ghost btn-sm" id="btn-gcal-connect" onclick="gcalConnect()" title="Se connecter à Google">🔗 Connexion</button>
+    <button class="btn btn-ghost btn-sm" id="btn-gcal-disconnect" onclick="gcalDisconnect()" style="display:none;" title="Se déconnecter de Google">🔓 Déco</button>
     <button class="btn btn-sm" id="btn-cloud-push" onclick="forceCloudPush()" style="display:none;" title="Envoyer mes données vers le cloud">☁️ Envoyer ↑</button>
     <button class="btn btn-ghost btn-sm" id="btn-cloud-pull" onclick="forceCloudPull()" style="display:none;" title="Récupérer les données depuis le cloud">☁️ Récupérer ↓</button>
     <button class="btn btn-sm" id="btn-gcal-sync" onclick="gcalSyncAll()" style="display:none;" title="Synchroniser vers Google Calendar">📅 Sync Cal</button>
@@ -1951,6 +1952,7 @@ function updateGcalUI(connected, configured) {
   const dot = document.getElementById('gcal-dot');
   const text = document.getElementById('gcal-status-text');
   const btnConnect = document.getElementById('btn-gcal-connect');
+  const btnDisconnect = document.getElementById('btn-gcal-disconnect');
   const btnSync = document.getElementById('btn-gcal-sync');
   const btnPush = document.getElementById('btn-cloud-push');
   const btnPull = document.getElementById('btn-cloud-pull');
@@ -1960,6 +1962,7 @@ function updateGcalUI(connected, configured) {
     text.textContent = 'Google : connecté';
     text.style.color = 'var(--success)';
     btnConnect.style.display = 'none';
+    btnDisconnect.style.display = 'inline-flex';
     btnSync.style.display = 'inline-flex';
     btnPush.style.display = 'inline-flex';
     btnPull.style.display = 'inline-flex';
@@ -1968,6 +1971,7 @@ function updateGcalUI(connected, configured) {
     text.textContent = 'Google : prêt';
     text.style.color = 'var(--warn)';
     btnConnect.style.display = 'inline-flex';
+    btnDisconnect.style.display = 'none';
     btnSync.style.display = 'none';
     btnPush.style.display = 'none';
     btnPull.style.display = 'none';
@@ -1976,10 +1980,30 @@ function updateGcalUI(connected, configured) {
     text.textContent = gcalClientId ? 'Google : déconnecté' : 'Non configuré';
     text.style.color = 'var(--text-faint)';
     btnConnect.style.display = gcalClientId ? 'inline-flex' : 'none';
+    btnDisconnect.style.display = 'none';
     btnSync.style.display = 'none';
     btnPush.style.display = 'none';
     btnPull.style.display = 'none';
   }
+}
+
+function gcalDisconnect() {
+  // Révoquer le token
+  if (gcalAccessToken) {
+    google.accounts.oauth2.revoke(gcalAccessToken, () => {
+      console.log('Token Google révoqué');
+    });
+  }
+  gcalAccessToken = null;
+  gcalConnected = false;
+  gcalTokenClient = null;
+  cloudFileId = null;
+  googleEvents = [];
+  googleEventsLoaded = false;
+  updateGcalUI(false, true);
+  const syncEl = document.getElementById('sync-status');
+  if (syncEl) syncEl.innerHTML = '';
+  toast('Déconnecté de Google. Reconnecte-toi pour réautoriser les permissions.', 'success');
 }
 
 function gcalConnect() {
@@ -2334,13 +2358,19 @@ function updateSyncStatus(status) {
 async function findCloudFile() {
   try {
     const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=name='${CLOUD_FILENAME}' and trashed=false&spaces=appDataFolder,drive&fields=files(id,name,modifiedTime)`,
+      `https://www.googleapis.com/drive/v3/files?q=name='${CLOUD_FILENAME}'+and+trashed=false&fields=files(id,name,modifiedTime)`,
       { headers: { 'Authorization': 'Bearer ' + gcalAccessToken } }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('Erreur findCloudFile:', res.status, errText);
+      if (res.status === 403 || res.status === 401) {
+        toast('⚠️ Permission Google Drive refusée.\nDéconnecte-toi et reconnecte-toi pour réautoriser.', 'error');
+      }
+      return null;
+    }
     const data = await res.json();
     if (data.files && data.files.length > 0) {
-      // Prendre le plus récent
       data.files.sort((a, b) => new Date(b.modifiedTime) - new Date(a.modifiedTime));
       cloudFileId = data.files[0].id;
       return cloudFileId;
@@ -2348,6 +2378,7 @@ async function findCloudFile() {
     return null;
   } catch(e) {
     console.error('Erreur recherche fichier cloud:', e);
+    toast('Erreur réseau lors de la recherche cloud', 'error');
     return null;
   }
 }
@@ -2522,11 +2553,25 @@ async function forceCloudPush() {
   
   if (!confirm(`Envoyer vos ${affaires.length} affaire(s) vers le cloud ?\n\nCeci écrasera les données cloud avec vos données locales.`)) return;
   
+  updateSyncStatus('saving');
   toast('☁️ Envoi vers le cloud...', 'success');
-  cloudFileId = null; // Forcer la recherche du fichier
-  await findCloudFile();
-  await saveToCloud();
-  toast(`☁️ ${affaires.length} affaire(s) envoyée(s) vers le cloud ✓`, 'success');
+  
+  try {
+    cloudFileId = null;
+    await findCloudFile();
+    await saveToCloud();
+    
+    if (cloudFileId) {
+      toast(`☁️ ${affaires.length} affaire(s) envoyée(s) vers le cloud ✓`, 'success');
+    } else {
+      toast('⚠️ Erreur lors de l\'envoi. Vérifie que l\'API Google Drive est activée et reconnecte-toi.', 'error');
+      updateSyncStatus('error');
+    }
+  } catch(e) {
+    console.error('Erreur forceCloudPush:', e);
+    toast('Erreur d\'envoi vers le cloud. Essaie de te déconnecter (🔓) puis reconnecter.', 'error');
+    updateSyncStatus('error');
+  }
 }
 
 // Forcer la récupération des données depuis le cloud
