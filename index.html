@@ -3248,10 +3248,22 @@ function initMap(aff) {
   setTimeout(() => { if (map) map.invalidateSize(); }, 100);
   setTimeout(() => { if (map) map.invalidateSize(); }, 500);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap © CARTO',
+  // Essayer plusieurs fournisseurs de tuiles
+  const tileLayers = [
+    { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© OpenStreetMap' },
+    { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© OpenStreetMap' },
+  ];
+  
+  const tileLayer = L.tileLayer(tileLayers[0].url, {
+    attribution: tileLayers[0].attr,
     maxZoom: 19,
+    crossOrigin: true,
   }).addTo(map);
+
+  // Si les tuiles ne chargent pas, essayer le fallback
+  tileLayer.on('tileerror', function() {
+    tileLayer.setUrl(tileLayers[1].url);
+  });
 
   affaires.forEach(a => {
     if (a.lat && a.lng) {
