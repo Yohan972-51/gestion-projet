@@ -859,6 +859,20 @@
     overflow: hidden;
     border: 1px solid rgba(34, 211, 238, 0.15);
     box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Le panel de la carte ne doit PAS avoir de backdrop-filter sinon écran noir */
+  .map-panel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(3, 20, 45, 0.75) !important;
+  }
+
+  .map-panel .panel-body {
+    background: transparent;
+    padding: 0 !important;
   }
 
   .leaflet-popup-content-wrapper, .leaflet-popup-tip {
@@ -866,7 +880,6 @@
     color: var(--text);
     border: 1px solid rgba(34, 211, 238, 0.3);
     border-radius: 12px;
-    backdrop-filter: blur(12px);
   }
   .leaflet-popup-content { margin: 12px 14px; }
 
@@ -3077,7 +3090,7 @@ function renderDetail() {
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel map-panel">
       <div class="panel-head">
         <h3>📍 Localisation du site</h3>
         ${aff.lat && aff.lng ? `<a href="https://www.google.com/maps?q=${aff.lat},${aff.lng}" target="_blank" class="btn btn-ghost btn-sm" style="text-decoration:none;">Ouvrir Google Maps →</a>` : ''}
@@ -3107,7 +3120,7 @@ function renderDetail() {
     </div>
   `;
 
-  setTimeout(() => initMap(aff), 50);
+  setTimeout(() => initMap(aff), 200);
 }
 
 function renderChapter(aff, ch) {
@@ -3230,6 +3243,10 @@ function initMap(aff) {
 
   const center = (aff.lat && aff.lng) ? [aff.lat, aff.lng] : [46.603354, 1.888334];
   map = L.map('map', { zoomControl: true, scrollWheelZoom: false }).setView(center, aff.lat ? 15 : 6);
+
+  // Forcer le recalcul de la taille après le rendu
+  setTimeout(() => { if (map) map.invalidateSize(); }, 100);
+  setTimeout(() => { if (map) map.invalidateSize(); }, 500);
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/voyager/{z}/{x}/{y}{r}.png', {
     attribution: '© OpenStreetMap © CARTO',
