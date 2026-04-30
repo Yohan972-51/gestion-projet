@@ -11,6 +11,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <style>
   :root {
     --ocean: #0c4a6e;
@@ -881,18 +883,15 @@
     </div>
   </div>
   <div class="topbar-actions">
-    <div id="sync-status" style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:0.5px;"></div>
+    <div id="sync-status" style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:0.5px;"><span style="color:var(--text-faint);">🔥 Temps réel</span></div>
     <div class="gcal-status" id="gcal-status">
       <span class="gcal-dot" id="gcal-dot"></span>
       <span id="gcal-status-text">Google : déconnecté</span>
     </div>
     <button class="btn btn-ghost btn-sm" onclick="openGcalSettings()" title="Configurer">⚙️</button>
     <button class="btn btn-ghost btn-sm" id="btn-gcal-connect" onclick="gcalConnect()" title="Se connecter à Google">🔗 Connexion</button>
-    <button class="btn btn-ghost btn-sm" id="btn-gcal-disconnect" onclick="gcalDisconnect()" style="display:none;" title="Se déconnecter de Google">🔓 Déco</button>
-    <button class="btn btn-sm" id="btn-cloud-push" onclick="forceCloudPush()" style="display:none;" title="Envoyer mes données vers le cloud">☁️ Envoyer ↑</button>
-    <button class="btn btn-ghost btn-sm" id="btn-cloud-pull" onclick="forceCloudPull()" style="display:none;" title="Récupérer les données depuis le cloud">☁️ Récupérer ↓</button>
-    <button class="btn btn-sm" id="btn-gcal-sync" onclick="gcalSyncAll()" style="display:none;" title="Synchroniser vers Google Calendar">📅 Sync Cal</button>
-    <button class="btn btn-ghost btn-sm" onclick="exportICS()" title="Export fichier ICS">📥</button>
+    <button class="btn btn-ghost btn-sm" id="btn-gcal-disconnect" onclick="gcalDisconnect()" style="display:none;" title="Se déconnecter">🔓</button>
+    <button class="btn btn-sm" id="btn-gcal-sync" onclick="gcalSyncAll()" style="display:none;" title="Sync Google Calendar">📅</button>
     <button class="btn btn-ghost btn-sm" onclick="exportJSON()" title="Sauvegarde JSON">💾</button>
     <label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Importer un fichier JSON">
       📂
@@ -1031,21 +1030,11 @@
 
       <div class="form-section">
         <div class="form-section-title">Architecture & Communication</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Protocoles bus</label>
-            <input type="text" class="input mono-input" id="f-protocols" placeholder="BACnet IP, Modbus RTU, KNX (virgules)">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Nombre de points I/O</label>
-            <input type="number" class="input" id="f-points" placeholder="128">
-          </div>
+        <div class="form-group">
+          <label class="form-label">Protocoles bus</label>
+          <input type="text" class="input mono-input" id="f-protocols" placeholder="BACnet IP, Modbus RTU, KNX (virgules)">
         </div>
-        <div class="form-row-3">
-          <div class="form-group">
-            <label class="form-label">IP automate</label>
-            <input type="text" class="input mono-input" id="f-ip" placeholder="192.168.1.10">
-          </div>
+        <div class="form-row">
           <div class="form-group">
             <label class="form-label">Accès distant</label>
             <select class="select" id="f-remote">
@@ -1248,15 +1237,13 @@ function initGcalClient() {
   try {
     gcalTokenClient = google.accounts.oauth2.initTokenClient({
       client_id: gcalClientId,
-      scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file',
+      scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events',
       callback: (tokenResponse) => {
         if (tokenResponse && tokenResponse.access_token) {
           gcalAccessToken = tokenResponse.access_token;
           gcalConnected = true;
           updateGcalUI(true);
-          toast('Connecté à Google — synchronisation...', 'success');
-          // Charger les données depuis Google Drive
-          loadFromCloud();
+          toast('Connecté à Google Calendar', 'success');
         } else {
           gcalConnected = false;
           updateGcalUI(false);
@@ -1283,8 +1270,6 @@ function updateGcalUI(connected, configured) {
   const btnConnect = document.getElementById('btn-gcal-connect');
   const btnDisconnect = document.getElementById('btn-gcal-disconnect');
   const btnSync = document.getElementById('btn-gcal-sync');
-  const btnPush = document.getElementById('btn-cloud-push');
-  const btnPull = document.getElementById('btn-cloud-pull');
 
   if (connected) {
     dot.classList.add('connected');
@@ -1293,8 +1278,6 @@ function updateGcalUI(connected, configured) {
     btnConnect.style.display = 'none';
     btnDisconnect.style.display = 'inline-flex';
     btnSync.style.display = 'inline-flex';
-    btnPush.style.display = 'inline-flex';
-    btnPull.style.display = 'inline-flex';
   } else if (configured) {
     dot.classList.remove('connected');
     text.textContent = 'Google : prêt';
@@ -1302,17 +1285,13 @@ function updateGcalUI(connected, configured) {
     btnConnect.style.display = 'inline-flex';
     btnDisconnect.style.display = 'none';
     btnSync.style.display = 'none';
-    btnPush.style.display = 'none';
-    btnPull.style.display = 'none';
   } else {
     dot.classList.remove('connected');
-    text.textContent = gcalClientId ? 'Google : déconnecté' : 'Non configuré';
+    text.textContent = gcalClientId ? 'Google : déconnecté' : '';
     text.style.color = 'var(--text-faint)';
     btnConnect.style.display = gcalClientId ? 'inline-flex' : 'none';
     btnDisconnect.style.display = 'none';
     btnSync.style.display = 'none';
-    btnPush.style.display = 'none';
-    btnPull.style.display = 'none';
   }
 }
 
@@ -1326,7 +1305,6 @@ function gcalDisconnect() {
   gcalAccessToken = null;
   gcalConnected = false;
   gcalTokenClient = null;
-  cloudFileId = null;
   googleEvents = [];
   googleEventsLoaded = false;
   updateGcalUI(false, true);
@@ -1538,427 +1516,153 @@ const MODEL_SUGGESTIONS = {
 
 // ============ STORAGE ============
 // Test si localStorage est disponible
-let storageAvailable = false;
-try {
-  localStorage.setItem('__test__', '1');
-  localStorage.removeItem('__test__');
-  storageAvailable = true;
-} catch(e) {
-  storageAvailable = false;
-}
+// ============ FIREBASE REALTIME DATABASE ============
+const firebaseConfig = {
+  apiKey: "AIzaSyAgfXgrKDMa-GyHhhN9XDVS1fSCu1KPdDg",
+  authDomain: "autorem-projet.firebaseapp.com",
+  databaseURL: "https://autorem-projet-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "autorem-projet",
+  storageBucket: "autorem-projet.firebasestorage.app",
+  messagingSenderId: "223745719407",
+  appId: "1:223745719407:web:1e67db658f10d3ee1fa19a",
+};
 
-let cloudSaving = false;
-let cloudFileId = null; // ID du fichier Autorem sur Google Drive
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const dbRef = db.ref('affaires');
+let firebaseReady = false;
 let saveTimeout = null;
-const CLOUD_FILENAME = 'autorem-data.json';
+let ignoreNextFirebaseUpdate = false;
 
 function loadData() {
+  // Charger depuis localStorage en attendant Firebase
   try {
-    if (storageAvailable) {
-      const raw = localStorage.getItem('autorem-data');
-      if (raw) {
-        const data = JSON.parse(raw);
-        affaires = data.affaires || [];
-        if (affaires.length > 0) activeId = affaires[0].id;
-        return;
-      }
+    const raw = localStorage.getItem('autorem-data');
+    if (raw) {
+      const data = JSON.parse(raw);
+      affaires = data.affaires || [];
+      if (affaires.length > 0) activeId = affaires[0].id;
     }
   } catch(e) {}
 
-  // Exemple par défaut
-  affaires = [{
-    id: Date.now(),
-    ref: 'GTB-2026-042',
-    name: 'Tour Alpha - Rénovation GTB',
-    siteType: 'Tertiaire',
-    address: '25 rue de la Défense, 92400 Courbevoie',
-    lat: 48.8924,
-    lng: 2.2403,
-    status: 'programmation',
-    brand: 'Schneider Electric',
-    model: 'Modicon M580',
-    software: 'EcoStruxure Control Expert',
-    firmware: 'v15.2',
-    supervisor: 'EcoStruxure Building Operation',
-    protocols: 'BACnet IP, Modbus RTU, KNX',
-    points: 480,
-    ip: '192.168.10.50',
-    remote: 'VPN',
-    plcCount: 3,
-    client: 'Foncière Alpha',
-    ca: 'Julien Martin',
-    startDate: '2026-01-10',
-    endDate: '2026-06-30',
-    createdAt: new Date().toISOString(),
-    chapters: [
-      {
-        id: 1001, title: 'Analyse fonctionnelle', icon: '📋',
-        tasks: [
-          { id: 1, text: 'Réception CCTP et plans CVC', done: true, date: '2026-01-15', priority: 'haute' },
-          { id: 2, text: 'Rédaction analyse fonctionnelle CTA', done: true, date: '2026-01-25', priority: 'haute' },
-          { id: 3, text: 'Validation AF par MOE', done: false, date: '2026-04-20', priority: 'haute' },
-        ],
-        comments: [
-          { id: 101, date: '2026-01-22T14:30:00Z', text: 'Points de consigne validés avec le bureau d\'étude. 6 CTA sur le site, 3 avec récupération d\'énergie.' },
-        ],
-      },
-      {
-        id: 1002, title: 'Programmation automate', icon: '💻',
-        tasks: [
-          { id: 4, text: 'Configuration hardware M580', done: true, date: '2026-02-05', priority: 'haute' },
-          { id: 5, text: 'Développement blocs CTA standards', done: true, date: '2026-02-20', priority: 'haute' },
-          { id: 6, text: 'Développement régulation cascade chaufferie', done: false, date: '2026-04-25', priority: 'haute' },
-          { id: 7, text: 'Programmation horloges et délestage', done: false, date: '2026-05-02', priority: 'moyenne' },
-        ],
-        comments: [
-          { id: 102, date: '2026-02-18T10:15:00Z', text: 'Bloc CTA v2.3 finalisé avec gestion free-cooling et free-chilling. Testé en simulation, OK.' },
-        ],
-      },
-      {
-        id: 1003, title: 'Paramétrage superviseur', icon: '🖥️',
-        tasks: [
-          { id: 8, text: 'Import BACnet points (480 pts)', done: false, date: '2026-05-10', priority: 'haute' },
-          { id: 9, text: 'Création synoptiques CTA', done: false, date: '2026-05-15', priority: 'moyenne' },
-          { id: 10, text: 'Paramétrage alarmes et consignation', done: false, date: '2026-05-20', priority: 'moyenne' },
-        ],
-        comments: [],
-      },
-      {
-        id: 1004, title: 'Mise au point sur site', icon: '🔧',
-        tasks: [
-          { id: 11, text: 'Forçage sorties TOR + vérification actionneurs', done: false, priority: 'haute' },
-          { id: 12, text: 'Calibration sondes analogiques', done: false, priority: 'moyenne' },
-          { id: 13, text: 'Tests régulation en charge', done: false, priority: 'haute' },
-        ],
-        comments: [],
-      },
-    ],
-  }];
-  activeId = affaires[0].id;
-  saveDataLocal();
-}
-
-// Sauvegarde locale (instantanée)
-function saveDataLocal() {
-  if (!storageAvailable) return;
-  try { localStorage.setItem('autorem-data', JSON.stringify({ affaires })); }
-  catch(e) { console.warn('Sauvegarde locale impossible:', e); }
-}
-
-// Sauvegarde combinée : locale immédiate + cloud avec délai
-function saveData() {
-  saveDataLocal();
-  // Sauvegarder dans le cloud avec un délai de 2s pour regrouper les modifications rapides
-  if (gcalConnected && gcalAccessToken) {
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => saveToCloud(), 2000);
-    updateSyncStatus('saving');
+  // Si rien en local, charger l'exemple
+  if (!affaires.length) {
+    affaires = [{
+      id: Date.now(),
+      ref: 'GTB-2026-042',
+      name: 'Tour Alpha - Rénovation GTB',
+      siteType: 'Tertiaire',
+      address: '25 rue de la Défense, 92400 Courbevoie',
+      lat: 48.8924, lng: 2.2403,
+      status: 'programmation',
+      brand: 'Schneider Electric', model: 'Modicon M580',
+      software: 'EcoStruxure Control Expert', firmware: 'v15.2',
+      supervisor: 'EcoStruxure Building Operation',
+      protocols: 'BACnet IP, Modbus RTU, KNX',
+      points: 480, ip: '192.168.10.50', remote: 'VPN', plcCount: 3,
+      client: 'Foncière Alpha', ca: 'Julien Martin',
+      startDate: '2026-01-10', endDate: '2026-06-30',
+      createdAt: new Date().toISOString(),
+      chapters: [
+        { id: 1001, title: 'Analyse fonctionnelle', icon: '📋',
+          tasks: [
+            { id: 1, text: 'Réception CCTP et plans CVC', done: true, status: 'done', date: '2026-01-15', priority: 'haute' },
+            { id: 2, text: 'Rédaction analyse fonctionnelle CTA', done: true, status: 'done', date: '2026-01-25', priority: 'haute' },
+            { id: 3, text: 'Validation AF par MOE', done: false, status: 'not-started', date: '2026-04-20', priority: 'haute' },
+          ],
+          comments: [{ id: 101, date: '2026-01-22T14:30:00Z', text: 'Points de consigne validés avec le bureau d\'étude.' }],
+        },
+        { id: 1002, title: 'Programmation automate', icon: '💻',
+          tasks: [
+            { id: 4, text: 'Configuration hardware M580', done: true, status: 'done', date: '2026-02-05', priority: 'haute' },
+            { id: 5, text: 'Développement blocs CTA standards', done: true, status: 'done', date: '2026-02-20', priority: 'haute' },
+            { id: 6, text: 'Développement régulation cascade chaufferie', done: false, status: 'not-started', date: '2026-04-25', priority: 'haute' },
+          ],
+          comments: [],
+        },
+        { id: 1003, title: 'Mise au point sur site', icon: '🔧',
+          tasks: [
+            { id: 11, text: 'Forçage sorties TOR', done: false, status: 'not-started', priority: 'haute' },
+            { id: 12, text: 'Calibration sondes', done: false, status: 'not-started', priority: 'moyenne' },
+          ],
+          comments: [],
+        },
+      ],
+    }];
+    activeId = affaires[0].id;
   }
+
+  // Écouter Firebase en temps réel
+  dbRef.on('value', (snapshot) => {
+    if (ignoreNextFirebaseUpdate) {
+      ignoreNextFirebaseUpdate = false;
+      return;
+    }
+    const data = snapshot.val();
+    if (data && Array.isArray(data)) {
+      affaires = data;
+      if (!activeId && affaires.length) activeId = affaires[0].id;
+      // Sauvegarder en local aussi
+      try { localStorage.setItem('autorem-data', JSON.stringify({ affaires })); } catch(e) {}
+      renderSidebar();
+      renderDetail();
+      if (currentView === 'planning') renderPlanning();
+      updateSyncStatus('saved');
+      firebaseReady = true;
+    }
+  }, (error) => {
+    console.error('Erreur Firebase:', error);
+    updateSyncStatus('error');
+  });
+
+  // Premier push si Firebase est vide
+  setTimeout(() => {
+    if (!firebaseReady && affaires.length) {
+      dbRef.set(affaires).then(() => {
+        firebaseReady = true;
+        updateSyncStatus('saved');
+        toast('🔥 Données synchronisées avec Firebase', 'success');
+      });
+    }
+  }, 3000);
 }
 
-// ============ GOOGLE DRIVE CLOUD SYNC ============
+function saveData() {
+  // Local immédiat
+  try { localStorage.setItem('autorem-data', JSON.stringify({ affaires })); } catch(e) {}
+
+  // Firebase avec délai anti-spam
+  clearTimeout(saveTimeout);
+  updateSyncStatus('saving');
+  saveTimeout = setTimeout(() => {
+    ignoreNextFirebaseUpdate = true;
+    dbRef.set(affaires).then(() => {
+      updateSyncStatus('saved');
+    }).catch((err) => {
+      console.error('Erreur Firebase save:', err);
+      updateSyncStatus('error');
+    });
+  }, 1000);
+}
+
 function updateSyncStatus(status) {
   const el = document.getElementById('sync-status');
   if (!el) return;
   switch(status) {
     case 'saving':
-      el.innerHTML = '<span style="color:var(--warn);">☁️ Sync en cours...</span>';
+      el.innerHTML = '<span style="color:var(--warn);">🔥 Sync...</span>';
       break;
     case 'saved':
-      el.innerHTML = '<span style="color:var(--success);">☁️ Synchronisé ✓</span>';
+      el.innerHTML = '<span style="color:var(--success);">🔥 Synchro ✓</span>';
       setTimeout(() => {
-        if (el.innerHTML.includes('Synchronisé')) {
-          el.innerHTML = '<span style="color:var(--text-faint);">☁️ Cloud activé</span>';
-        }
+        if (el.innerHTML.includes('Synchro')) el.innerHTML = '<span style="color:var(--text-faint);">🔥 Temps réel</span>';
       }, 3000);
       break;
     case 'error':
-      el.innerHTML = '<span style="color:var(--danger);">☁️ Erreur sync</span>';
-      break;
-    case 'loading':
-      el.innerHTML = '<span style="color:var(--primary);">☁️ Chargement cloud...</span>';
+      el.innerHTML = '<span style="color:var(--danger);">🔥 Erreur sync</span>';
       break;
     default:
-      el.innerHTML = '<span style="color:var(--text-faint);">☁️ Cloud activé</span>';
-  }
-}
-
-// Trouver le fichier autorem-data.json sur Google Drive
-async function findCloudFile() {
-  try {
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=name='${CLOUD_FILENAME}'+and+trashed=false&fields=files(id,name,modifiedTime)`,
-      { headers: { 'Authorization': 'Bearer ' + gcalAccessToken } }
-    );
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('Erreur findCloudFile:', res.status, errText);
-      if (res.status === 403 || res.status === 401) {
-        toast('⚠️ Permission Google Drive refusée.\nDéconnecte-toi et reconnecte-toi pour réautoriser.', 'error');
-      }
-      return null;
-    }
-    const data = await res.json();
-    if (data.files && data.files.length > 0) {
-      data.files.sort((a, b) => new Date(b.modifiedTime) - new Date(a.modifiedTime));
-      cloudFileId = data.files[0].id;
-      return cloudFileId;
-    }
-    return null;
-  } catch(e) {
-    console.error('Erreur recherche fichier cloud:', e);
-    toast('Erreur réseau lors de la recherche cloud', 'error');
-    return null;
-  }
-}
-
-// Charger les données depuis Google Drive
-async function loadFromCloud() {
-  if (!gcalConnected || !gcalAccessToken) return;
-  
-  updateSyncStatus('loading');
-  
-  try {
-    // Chercher le fichier
-    const fileId = await findCloudFile();
-    
-    if (!fileId) {
-      // Pas de fichier cloud → on upload les données locales
-      toast('☁️ Première synchro — envoi de vos données vers le cloud', 'success');
-      await saveToCloud();
-      updateSyncStatus('saved');
-      return;
-    }
-
-    // Télécharger le contenu
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-      { headers: { 'Authorization': 'Bearer ' + gcalAccessToken } }
-    );
-    
-    if (!res.ok) {
-      updateSyncStatus('error');
-      toast('Erreur chargement depuis le cloud', 'error');
-      return;
-    }
-
-    const data = await res.json();
-    
-    if (data.affaires && Array.isArray(data.affaires)) {
-      // Comparer : cloud plus récent que local ?
-      const cloudTime = data.lastSaved ? new Date(data.lastSaved).getTime() : 0;
-      let localTime = 0;
-      try {
-        const localRaw = localStorage.getItem('autorem-data');
-        if (localRaw) {
-          const localData = JSON.parse(localRaw);
-          localTime = localData.lastSaved ? new Date(localData.lastSaved).getTime() : 0;
-        }
-      } catch(e) {}
-
-      if (cloudTime >= localTime || affaires.length <= 1) {
-        // Cloud est plus récent ou local a juste l'exemple → prendre cloud
-        affaires = data.affaires;
-        activeId = affaires.length ? affaires[0].id : null;
-        saveDataLocal();
-        renderSidebar();
-        renderDetail();
-        toast(`☁️ ${affaires.length} affaire(s) chargée(s) depuis le cloud`, 'success');
-      } else {
-        // Local est plus récent → demander
-        if (confirm(`Les données cloud (${data.affaires.length} affaires) sont plus anciennes que vos données locales (${affaires.length} affaires).\n\nVoulez-vous écraser vos données locales avec celles du cloud ?`)) {
-          affaires = data.affaires;
-          activeId = affaires.length ? affaires[0].id : null;
-          saveDataLocal();
-          renderSidebar();
-          renderDetail();
-          toast('☁️ Données cloud restaurées', 'success');
-        } else {
-          // Garder local et écraser le cloud
-          await saveToCloud();
-          toast('☁️ Données locales envoyées vers le cloud', 'success');
-        }
-      }
-    }
-    
-    updateSyncStatus('saved');
-    
-  } catch(e) {
-    console.error('Erreur loadFromCloud:', e);
-    updateSyncStatus('error');
-    toast('Erreur de synchronisation cloud', 'error');
-  }
-}
-
-// Sauvegarder les données vers Google Drive
-async function saveToCloud() {
-  if (!gcalConnected || !gcalAccessToken || cloudSaving) return;
-  cloudSaving = true;
-
-  try {
-    const content = JSON.stringify({
-      affaires,
-      lastSaved: new Date().toISOString(),
-      version: 5,
-      app: 'Autorem',
-    });
-
-    if (cloudFileId) {
-      // Mettre à jour le fichier existant
-      const res = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${cloudFileId}?uploadType=media`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Authorization': 'Bearer ' + gcalAccessToken,
-            'Content-Type': 'application/json',
-          },
-          body: content,
-        }
-      );
-      if (res.ok) {
-        updateSyncStatus('saved');
-      } else {
-        console.error('Erreur update cloud:', await res.text());
-        updateSyncStatus('error');
-      }
-    } else {
-      // Créer un nouveau fichier
-      const metadata = {
-        name: CLOUD_FILENAME,
-        mimeType: 'application/json',
-        description: 'Données Autorem - Suivi GTB',
-      };
-
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', new Blob([content], { type: 'application/json' }));
-
-      const res = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-        {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + gcalAccessToken },
-          body: form,
-        }
-      );
-
-      if (res.ok) {
-        const result = await res.json();
-        cloudFileId = result.id;
-        updateSyncStatus('saved');
-      } else {
-        console.error('Erreur création cloud:', await res.text());
-        updateSyncStatus('error');
-      }
-    }
-
-    // Mettre à jour le timestamp local aussi
-    if (storageAvailable) {
-      try {
-        localStorage.setItem('autorem-data', JSON.stringify({
-          affaires,
-          lastSaved: new Date().toISOString(),
-        }));
-      } catch(e) {}
-    }
-
-  } catch(e) {
-    console.error('Erreur saveToCloud:', e);
-    updateSyncStatus('error');
-  }
-  
-  cloudSaving = false;
-}
-
-// ============ BOUTONS SYNCHRO MANUELS ============
-
-// Forcer l'envoi des données locales vers le cloud
-async function forceCloudPush() {
-  if (!gcalConnected || !gcalAccessToken) {
-    toast('Connecte-toi d\'abord à Google', 'error');
-    return;
-  }
-  
-  if (!confirm(`Envoyer vos ${affaires.length} affaire(s) vers le cloud ?\n\nCeci écrasera les données cloud avec vos données locales.`)) return;
-  
-  updateSyncStatus('saving');
-  toast('☁️ Envoi vers le cloud...', 'success');
-  
-  try {
-    cloudFileId = null;
-    await findCloudFile();
-    await saveToCloud();
-    
-    if (cloudFileId) {
-      toast(`☁️ ${affaires.length} affaire(s) envoyée(s) vers le cloud ✓`, 'success');
-    } else {
-      toast('⚠️ Erreur lors de l\'envoi. Vérifie que l\'API Google Drive est activée et reconnecte-toi.', 'error');
-      updateSyncStatus('error');
-    }
-  } catch(e) {
-    console.error('Erreur forceCloudPush:', e);
-    toast('Erreur d\'envoi vers le cloud. Essaie de te déconnecter (🔓) puis reconnecter.', 'error');
-    updateSyncStatus('error');
-  }
-}
-
-// Forcer la récupération des données depuis le cloud
-async function forceCloudPull() {
-  if (!gcalConnected || !gcalAccessToken) {
-    toast('Connecte-toi d\'abord à Google', 'error');
-    return;
-  }
-  
-  updateSyncStatus('loading');
-  
-  try {
-    const fileId = await findCloudFile();
-    
-    if (!fileId) {
-      toast('Aucune donnée trouvée dans le cloud. Utilise "Envoyer ↑" d\'abord depuis le PC qui a tes données.', 'error');
-      updateSyncStatus('error');
-      return;
-    }
-
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-      { headers: { 'Authorization': 'Bearer ' + gcalAccessToken } }
-    );
-    
-    if (!res.ok) {
-      toast('Erreur de téléchargement depuis le cloud', 'error');
-      updateSyncStatus('error');
-      return;
-    }
-
-    const data = await res.json();
-    
-    if (!data.affaires || !Array.isArray(data.affaires)) {
-      toast('Fichier cloud invalide', 'error');
-      updateSyncStatus('error');
-      return;
-    }
-
-    const lastSaved = data.lastSaved ? new Date(data.lastSaved).toLocaleString('fr-FR') : 'date inconnue';
-    
-    if (!confirm(`${data.affaires.length} affaire(s) trouvée(s) dans le cloud.\nDernière sauvegarde : ${lastSaved}\n\nRemplacer vos données locales par celles du cloud ?`)) {
-      updateSyncStatus('saved');
-      return;
-    }
-
-    affaires = data.affaires;
-    activeId = affaires.length ? affaires[0].id : null;
-    saveDataLocal();
-    renderSidebar();
-    renderDetail();
-    updateSyncStatus('saved');
-    toast(`☁️ ${affaires.length} affaire(s) récupérée(s) depuis le cloud ✓`, 'success');
-    
-  } catch(e) {
-    console.error('Erreur forceCloudPull:', e);
-    toast('Erreur de récupération cloud', 'error');
-    updateSyncStatus('error');
+      el.innerHTML = '<span style="color:var(--text-faint);">🔥 Temps réel</span>';
   }
 }
 
@@ -2046,7 +1750,7 @@ function renderSidebar() {
         <div class="progress-track"><div class="progress-fill" style="width:${prog}%"></div></div>
         <div class="aff-foot">
           <span class="progress-pct">${prog}%</span>
-          <span style="font-family:'JetBrains Mono';font-size:10px;color:var(--text-faint);">${allTasks.filter(t => getTaskStatus(t) === 'done').length}/${allTasks.length} · ${aff.points || 0} pts</span>
+          <span style="font-family:'JetBrains Mono';font-size:10px;color:var(--text-faint);">${allTasks.filter(t => getTaskStatus(t) === 'done').length}/${allTasks.length}</span>
         </div>
       </div>
     `;
@@ -2096,9 +1800,7 @@ function renderDetail() {
         <div class="meta-item"><div class="label">Type de site</div><div class="value">${escapeHtml(aff.siteType) || '—'}</div></div>
         <div class="meta-item"><div class="label">Atelier logiciel</div><div class="value mono">${escapeHtml(aff.software) || '—'}</div></div>
         <div class="meta-item"><div class="label">Superviseur</div><div class="value">${escapeHtml(aff.supervisor) || '—'}</div></div>
-        <div class="meta-item"><div class="label">Points I/O</div><div class="value mono">${aff.points || '—'}</div></div>
         <div class="meta-item"><div class="label">Nb automates</div><div class="value mono">${aff.plcCount || '—'}</div></div>
-        <div class="meta-item"><div class="label">IP automate</div><div class="value mono">${escapeHtml(aff.ip) || '—'}</div></div>
         <div class="meta-item"><div class="label">Accès distant</div><div class="value">${escapeHtml(aff.remote) || '—'}</div></div>
         <div class="meta-item"><div class="label">Client</div><div class="value">${escapeHtml(aff.client) || '—'}</div></div>
         <div class="meta-item"><div class="label">Chargé d'affaire</div><div class="value">${escapeHtml(aff.ca) || '—'}</div></div>
@@ -2342,7 +2044,7 @@ function selectAffaire(id) {
 function openAffaireModal() {
   editingId = null;
   document.getElementById('modal-title').textContent = 'Nouvelle affaire GTB';
-  ['f-name','f-ref','f-addr','f-lat','f-lng','f-model','f-software','f-firmware','f-supervisor','f-protocols','f-points','f-ip','f-plc-count','f-client','f-ca','f-start-date','f-end-date','f-search-place'].forEach(id => document.getElementById(id).value = '');
+  ['f-name','f-ref','f-addr','f-lat','f-lng','f-model','f-software','f-firmware','f-supervisor','f-protocols','f-plc-count','f-client','f-ca','f-start-date','f-end-date','f-search-place'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-status').value = 'programmation';
   document.getElementById('f-site-type').value = 'Tertiaire';
   document.getElementById('f-brand').value = '';
@@ -2368,8 +2070,7 @@ function editAffaire(id) {
   setVal('f-firmware', aff.firmware);
   setVal('f-supervisor', aff.supervisor);
   setVal('f-protocols', aff.protocols);
-  setVal('f-points', aff.points);
-  setVal('f-ip', aff.ip);
+  setVal('f-remote', aff.remote);
   setVal('f-remote', aff.remote);
   setVal('f-plc-count', aff.plcCount);
   setVal('f-addr', aff.address);
@@ -2401,8 +2102,7 @@ function saveAffaire() {
     firmware: document.getElementById('f-firmware').value.trim(),
     supervisor: document.getElementById('f-supervisor').value.trim(),
     protocols: document.getElementById('f-protocols').value.trim(),
-    points: parseInt(document.getElementById('f-points').value) || null,
-    ip: document.getElementById('f-ip').value.trim(),
+    remote: document.getElementById('f-remote').value,
     remote: document.getElementById('f-remote').value,
     plcCount: parseInt(document.getElementById('f-plc-count').value) || null,
     address: document.getElementById('f-addr').value.trim(),
@@ -3376,9 +3076,6 @@ function download(content, filename, type) {
   }
   renderSidebar();
   renderDetail();
-  if (!storageAvailable) {
-    toast('Mode hors-ligne : utilise Export/Import pour sauvegarder', 'error');
-  }
   // Init Google Calendar après que le script GIS soit chargé
   if (gcalClientId) {
     const waitGIS = setInterval(() => {
