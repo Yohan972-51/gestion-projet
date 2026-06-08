@@ -261,6 +261,37 @@
     border-radius: 10px; font-size: 10px; color: var(--lagoon);
   }
 
+  /* ======= FILTRE ======= */
+  .filter-zone {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: rgba(8, 47, 73, 0.35);
+    border: 1px solid rgba(34, 211, 238, 0.1);
+    border-radius: 10px;
+  }
+
+  .filter-label {
+    display: block;
+    font-family: 'JetBrains Mono';
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .filter-zone .select {
+    font-size: 12px;
+    padding: 7px 10px;
+  }
+
+  .filter-active-indicator {
+    display: inline-block;
+    margin-left: 6px;
+    color: var(--lagoon);
+    font-weight: 600;
+  }
+
   /* ======= AFFAIRE ITEMS ======= */
   .affaire-item {
     background: var(--glass);
@@ -971,6 +1002,12 @@
       <button class="view-tab" id="tab-planning" onclick="switchView('planning')">📅 Planning</button>
     </div>
     <button class="new-btn" onclick="openAffaireModal()">＋ Nouvelle affaire GTB</button>
+    <div class="filter-zone">
+      <label class="filter-label">🔍 Filtrer par chargé d'affaire</label>
+      <select class="select" id="ca-filter" onchange="updateCaFilter()">
+        <option value="">— Tous les chargés —</option>
+      </select>
+    </div>
     <div class="section-label">
       <span>Affaires</span>
       <span class="count-badge" id="count-badge">0</span>
@@ -1263,6 +1300,7 @@
 // ============ ÉTAT ============
 let affaires = [];
 let activeId = null;
+let caFilter = ''; // filtre par chargé d'affaire (vide = tous)
 let map = null;
 let editingId = null;
 let editingChapterId = null;
@@ -1882,21 +1920,70 @@ function updateModelOptions() {
 }
 
 // ============ RENDER ============
+function populateCaFilter() {
+  const select = document.getElementById('ca-filter');
+  if (!select) return;
+
+  // Récupérer tous les chargés d'affaire uniques (non vides), triés
+  const cas = [...new Set(
+    affaires.map(a => (a.ca || '').trim()).filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b, 'fr'));
+
+  // Préserver la sélection actuelle si elle existe encore
+  const currentValue = caFilter;
+
+  select.innerHTML = '<option value="">— Tous les chargés —</option>' +
+    cas.map(ca => `<option value="${escapeHtml(ca)}" ${ca === currentValue ? 'selected' : ''}>${escapeHtml(ca)}</option>`).join('') +
+    '<option value="__none__"' + (currentValue === '__none__' ? ' selected' : '') + '>— Sans chargé d\'affaire —</option>';
+
+  // Si le CA filtré n'existe plus, le reset
+  if (currentValue && currentValue !== '__none__' && !cas.includes(currentValue)) {
+    caFilter = '';
+    select.value = '';
+  }
+}
+
+function updateCaFilter() {
+  caFilter = document.getElementById('ca-filter').value;
+  renderSidebar();
+}
+
+function getFilteredAffaires() {
+  if (!caFilter) return affaires;
+  if (caFilter === '__none__') {
+    return affaires.filter(a => !(a.ca || '').trim());
+  }
+  return affaires.filter(a => (a.ca || '').trim() === caFilter);
+}
+
 function renderSidebar() {
-  document.getElementById('count-badge').textContent = affaires.length;
+  populateCaFilter();
+  const filtered = getFilteredAffaires();
+  const badge = document.getElementById('count-badge');
+  const total = affaires.length;
+  badge.textContent = caFilter ? `${filtered.length}/${total}` : total;
+
   const list = document.getElementById('affaire-list');
   if (!affaires.length) {
     list.innerHTML = '<div style="text-align:center;color:var(--text-faint);font-size:12px;padding:30px 0;">Aucune affaire</div>';
     return;
   }
-  list.innerHTML = affaires.map(aff => {
+  if (!filtered.length) {
+    list.innerHTML = `
+      <div style="text-align:center;color:var(--text-faint);font-size:12px;padding:30px 0;">
+        Aucune affaire pour ce chargé<br>
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="document.getElementById('ca-filter').value='';updateCaFilter();">Réinitialiser le filtre</button>
+      </div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(aff => {
     const prog = getProgress(aff);
     const allTasks = (aff.chapters || []).flatMap(c => c.tasks || []);
     return `
       <div class="affaire-item ${aff.id === activeId ? 'active' : ''}" onclick="selectAffaire(${aff.id})">
         <div class="aff-head">
           <div style="min-width:0;flex:1;">
-            <div class="aff-ref">${escapeHtml(aff.ref) || '—'}</div>
+            <div class="aff-ref">${escapeHtml(aff.ref) || '—'}${aff.ca ? ' · 👤 ' + escapeHtml(aff.ca) : ''}</div>
             <div class="aff-name">${escapeHtml(aff.name)}</div>
           </div>
           <span class="status-pill status-${aff.status}">${aff.status.replace(/-/g, ' ')}</span>
