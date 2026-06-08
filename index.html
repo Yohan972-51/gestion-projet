@@ -352,6 +352,70 @@
     margin-right: 4px; margin-bottom: 4px;
   }
 
+  /* Protocols checkboxes grid */
+  .protocols-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .protocol-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(8, 47, 73, 0.4);
+    border: 1px solid rgba(34, 211, 238, 0.12);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 12px;
+    user-select: none;
+  }
+
+  .protocol-checkbox:hover {
+    border-color: rgba(34, 211, 238, 0.3);
+    background: rgba(34, 211, 238, 0.06);
+  }
+
+  .protocol-checkbox.checked {
+    border-color: var(--lagoon);
+    background: rgba(34, 211, 238, 0.12);
+    color: var(--lagoon);
+    font-weight: 600;
+  }
+
+  .protocol-checkbox input {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--text-faint);
+    border-radius: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    position: relative;
+    transition: all 0.15s;
+    margin: 0;
+  }
+
+  .protocol-checkbox input:checked {
+    background: var(--lagoon);
+    border-color: var(--lagoon);
+  }
+
+  .protocol-checkbox input:checked::after {
+    content: '✓';
+    position: absolute;
+    color: var(--ocean);
+    font-size: 11px;
+    font-weight: 700;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
   /* ======= KPI ======= */
   .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 20px; }
   .kpi {
@@ -1012,45 +1076,36 @@
             <datalist id="model-suggestions"></datalist>
           </div>
         </div>
-        <div class="form-row-3">
-          <div class="form-group">
-            <label class="form-label">Logiciel / Atelier</label>
-            <input type="text" class="input mono-input" id="f-software" placeholder="Unity Pro, TIA Portal, EBO...">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Version firmware</label>
-            <input type="text" class="input mono-input" id="f-firmware" placeholder="v2.14.3">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Superviseur</label>
-            <input type="text" class="input" id="f-supervisor" placeholder="Desigo CC, Niagara, EBO...">
-          </div>
+        <div class="form-group">
+          <label class="form-label">Logiciel / Atelier de programmation (cocher ceux utilisés)</label>
+          <div class="protocols-grid" id="f-software-grid"></div>
+          <input type="text" class="input mono-input" id="f-software-other" placeholder="Autres logiciels (séparés par des virgules)" style="margin-top:8px;font-size:11px;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Superviseur (cocher ceux utilisés)</label>
+          <div class="protocols-grid" id="f-supervisor-grid"></div>
+          <input type="text" class="input mono-input" id="f-supervisor-other" placeholder="Autres superviseurs (séparés par des virgules)" style="margin-top:8px;font-size:11px;">
         </div>
       </div>
 
       <div class="form-section">
         <div class="form-section-title">Architecture & Communication</div>
         <div class="form-group">
-          <label class="form-label">Protocoles bus</label>
-          <input type="text" class="input mono-input" id="f-protocols" placeholder="BACnet IP, Modbus RTU, KNX (virgules)">
+          <label class="form-label">Protocoles bus (cocher ceux utilisés)</label>
+          <div class="protocols-grid" id="f-protocols-grid"></div>
+          <input type="text" class="input mono-input" id="f-protocols-other" placeholder="Autres protocoles (séparés par des virgules)" style="margin-top:8px;font-size:11px;">
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Accès distant</label>
-            <select class="select" id="f-remote">
-              <option value="">Aucun</option>
-              <option value="VPN">VPN</option>
-              <option value="TeamViewer">TeamViewer</option>
-              <option value="AnyDesk">AnyDesk</option>
-              <option value="IP publique">IP publique</option>
-              <option value="Cloud">Cloud constructeur</option>
-              <option value="Autre">Autre</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Nb d'automates</label>
-            <input type="number" class="input" id="f-plc-count" placeholder="1">
-          </div>
+        <div class="form-group">
+          <label class="form-label">Accès distant</label>
+          <select class="select" id="f-remote">
+            <option value="">Aucun</option>
+            <option value="VPN">VPN</option>
+            <option value="TeamViewer">TeamViewer</option>
+            <option value="AnyDesk">AnyDesk</option>
+            <option value="IP publique">IP publique</option>
+            <option value="Cloud">Cloud constructeur</option>
+            <option value="Autre">Autre</option>
+          </select>
         </div>
       </div>
 
@@ -1134,6 +1189,30 @@
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeChapterModal()">Annuler</button>
       <button class="btn" onclick="saveChapter()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal sélection chapitres types -->
+<div class="modal-overlay" id="default-chapters-modal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-head">
+      <h3>Chapitres GTB à ajouter</h3>
+      <button class="modal-close" onclick="closeDefaultChaptersModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;">
+        Sélectionne les chapitres à ajouter à ton affaire :
+      </p>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button class="btn btn-ghost btn-sm" onclick="toggleAllDefaultChapters(true)">✓ Tout cocher</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleAllDefaultChapters(false)">✕ Tout décocher</button>
+      </div>
+      <div id="default-chapters-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeDefaultChaptersModal()">Annuler</button>
+      <button class="btn" onclick="confirmDefaultChapters()">Ajouter la sélection</button>
     </div>
   </div>
 </div>
@@ -1483,14 +1562,91 @@ async function gcalSyncAll() {
 
 const CHAPTER_ICONS = ['⚙️','🔧','💻','📡','🖥️','🔌','⚡','📊','📋','🎛️','🛠️','🧰','🔩','📐','📝','✅','🔬','🧪','🔗','📁','🚦','🗄️','🧮','🔎'];
 
+// Liste des protocoles bus standards en GTB/CVC
+const PROTOCOLS_LIST = [
+  'BACnet IP',
+  'BACnet MS/TP',
+  'Modbus RTU',
+  'Modbus TCP',
+  'KNX',
+  'LON / LonWorks',
+  'M-Bus',
+  'M-Bus sans-fil',
+  'OPC UA',
+  'OPC DA',
+  'MQTT',
+  'EnOcean',
+  'DALI',
+  'DMX',
+  'Profibus',
+  'Profinet',
+  'EtherCAT',
+  'CANopen',
+  'IO-Link',
+  'Z-Wave',
+  'Zigbee',
+  'WMBus',
+];
+
+// Liste des logiciels/ateliers de programmation GTB
+const SOFTWARE_LIST = [
+  'EcoStruxure Control Expert',
+  'EcoStruxure Machine Expert',
+  'Unity Pro',
+  'TIA Portal',
+  'Step 7',
+  'Desigo XWorks Plus',
+  'Desigo Configuration Manager',
+  'ABT Site',
+  'CODESYS',
+  'WAGO e!COCKPIT',
+  'TwinCAT',
+  'Niagara Workbench',
+  'EBO (EcoStruxure Building Operation)',
+  'IRC Suite',
+  'Distech EC-gfxProgram',
+  'Metasys SCT',
+  'CASE Suite (Sauter)',
+  'CARE (Honeywell)',
+  'SaiaPCD Programming',
+  'LonMaker',
+  'ETS (KNX)',
+  'PG5 (Saia)',
+];
+
+// Liste des superviseurs GTB
+const SUPERVISOR_LIST = [
+  'Desigo CC',
+  'Desigo Insight',
+  'EBO (EcoStruxure Building Operation)',
+  'StruxureWare',
+  'Niagara N4',
+  'Niagara AX',
+  'Metasys',
+  'Distech EC-Net',
+  'Trend 963',
+  'Tridium Workbench',
+  'TAC Vista',
+  'Sauter Vision Center',
+  'Honeywell EBI',
+  'Honeywell WEBs',
+  'Priva TC Manager',
+  'Hubbard',
+  'Wit Topkapi',
+  'PcVue',
+  'Panorama',
+  'WinCC',
+  'iFix',
+  'SCADA WebVision',
+];
+
 const DEFAULT_CHAPTERS = [
-  { title: 'Analyse fonctionnelle', icon: '📋' },
-  { title: 'Programmation automate', icon: '💻' },
-  { title: 'Paramétrage superviseur', icon: '🖥️' },
-  { title: 'Intégration bus terrain', icon: '📡' },
-  { title: 'Raccordement & câblage', icon: '🔌' },
-  { title: 'Mise au point sur site', icon: '🔧' },
-  { title: 'Recette & PV', icon: '✅' },
+  { title: 'Analyse Fonctionnelle', icon: '📋' },
+  { title: 'Liste de points', icon: '📐' },
+  { title: 'Programme', icon: '💻' },
+  { title: 'Vue graphique', icon: '🖥️' },
+  { title: 'Mise en service', icon: '🔧' },
+  { title: 'Réception', icon: '✅' },
 ];
 
 // Modèles suggérés par marque
@@ -1556,10 +1712,10 @@ function loadData() {
       lat: 48.8924, lng: 2.2403,
       status: 'programmation',
       brand: 'Schneider Electric', model: 'Modicon M580',
-      software: 'EcoStruxure Control Expert', firmware: 'v15.2',
+      software: 'EcoStruxure Control Expert',
       supervisor: 'EcoStruxure Building Operation',
       protocols: 'BACnet IP, Modbus RTU, KNX',
-      points: 480, ip: '192.168.10.50', remote: 'VPN', plcCount: 3,
+      remote: 'VPN',
       client: 'Foncière Alpha', ca: 'Julien Martin',
       startDate: '2026-01-10', endDate: '2026-06-30',
       createdAt: new Date().toISOString(),
@@ -1788,7 +1944,6 @@ function renderDetail() {
           <div class="detail-automate-banner">
             <span style="font-weight:700;">⚙ ${escapeHtml(aff.brand || '—')}</span>
             ${aff.model ? `<span style="opacity:0.7;">/</span><span>${escapeHtml(aff.model)}</span>` : ''}
-            ${aff.firmware ? `<span style="opacity:0.5;">· FW ${escapeHtml(aff.firmware)}</span>` : ''}
           </div>
         </div>
         <div class="action-buttons">
@@ -1800,7 +1955,6 @@ function renderDetail() {
         <div class="meta-item"><div class="label">Type de site</div><div class="value">${escapeHtml(aff.siteType) || '—'}</div></div>
         <div class="meta-item"><div class="label">Atelier logiciel</div><div class="value mono">${escapeHtml(aff.software) || '—'}</div></div>
         <div class="meta-item"><div class="label">Superviseur</div><div class="value">${escapeHtml(aff.supervisor) || '—'}</div></div>
-        <div class="meta-item"><div class="label">Nb automates</div><div class="value mono">${aff.plcCount || '—'}</div></div>
         <div class="meta-item"><div class="label">Accès distant</div><div class="value">${escapeHtml(aff.remote) || '—'}</div></div>
         <div class="meta-item"><div class="label">Client</div><div class="value">${escapeHtml(aff.client) || '—'}</div></div>
         <div class="meta-item"><div class="label">Chargé d'affaire</div><div class="value">${escapeHtml(aff.ca) || '—'}</div></div>
@@ -2041,15 +2195,57 @@ function selectAffaire(id) {
   renderDetail();
 }
 
+// Fonction générique pour rendre une grille de checkboxes
+function renderCheckboxGrid(gridId, list, selectedItems = []) {
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  grid.innerHTML = list.map(item => {
+    const checked = selectedItems.includes(item);
+    return `
+      <label class="protocol-checkbox ${checked ? 'checked' : ''}" onclick="toggleProtocolCheckbox(this)">
+        <input type="checkbox" value="${escapeHtml(item)}" ${checked ? 'checked' : ''}>
+        <span>${escapeHtml(item)}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+function toggleProtocolCheckbox(label) {
+  const cb = label.querySelector('input');
+  setTimeout(() => {
+    label.classList.toggle('checked', cb.checked);
+  }, 0);
+}
+
+// Récupérer les éléments sélectionnés d'une grille + champ "autres"
+function getSelectedFromGrid(gridId, otherFieldId) {
+  const checked = Array.from(document.querySelectorAll(`#${gridId} input:checked`)).map(cb => cb.value);
+  const others = document.getElementById(otherFieldId).value
+    .split(',').map(s => s.trim()).filter(Boolean);
+  return [...checked, ...others].join(', ');
+}
+
+// Parser une chaîne pour séparer standard vs autres
+function parseListString(str, referenceList) {
+  if (!str) return { standard: [], others: '' };
+  const all = str.split(',').map(s => s.trim()).filter(Boolean);
+  const standard = all.filter(p => referenceList.includes(p));
+  const others = all.filter(p => !referenceList.includes(p)).join(', ');
+  return { standard, others };
+}
+
 function openAffaireModal() {
   editingId = null;
   document.getElementById('modal-title').textContent = 'Nouvelle affaire GTB';
-  ['f-name','f-ref','f-addr','f-lat','f-lng','f-model','f-software','f-firmware','f-supervisor','f-protocols','f-plc-count','f-client','f-ca','f-start-date','f-end-date','f-search-place'].forEach(id => document.getElementById(id).value = '');
+  ['f-name','f-ref','f-addr','f-lat','f-lng','f-model','f-protocols-other','f-software-other','f-supervisor-other','f-client','f-ca','f-start-date','f-end-date','f-search-place'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-status').value = 'programmation';
   document.getElementById('f-site-type').value = 'Tertiaire';
   document.getElementById('f-brand').value = '';
   document.getElementById('f-remote').value = '';
   document.getElementById('geo-result').textContent = '';
+  renderCheckboxGrid('f-protocols-grid', PROTOCOLS_LIST, []);
+  renderCheckboxGrid('f-software-grid', SOFTWARE_LIST, []);
+  renderCheckboxGrid('f-supervisor-grid', SUPERVISOR_LIST, []);
   updateModelOptions();
   document.getElementById('affaire-modal').classList.add('open');
 }
@@ -2066,13 +2262,7 @@ function editAffaire(id) {
   setVal('f-site-type', aff.siteType || 'Tertiaire');
   setVal('f-brand', aff.brand);
   setVal('f-model', aff.model);
-  setVal('f-software', aff.software);
-  setVal('f-firmware', aff.firmware);
-  setVal('f-supervisor', aff.supervisor);
-  setVal('f-protocols', aff.protocols);
   setVal('f-remote', aff.remote);
-  setVal('f-remote', aff.remote);
-  setVal('f-plc-count', aff.plcCount);
   setVal('f-addr', aff.address);
   setVal('f-lat', aff.lat);
   setVal('f-lng', aff.lng);
@@ -2080,6 +2270,19 @@ function editAffaire(id) {
   setVal('f-ca', aff.ca);
   setVal('f-start-date', aff.startDate);
   setVal('f-end-date', aff.endDate);
+  // Parser et afficher les protocoles, logiciels, superviseurs
+  const protocolsParsed = parseListString(aff.protocols, PROTOCOLS_LIST);
+  renderCheckboxGrid('f-protocols-grid', PROTOCOLS_LIST, protocolsParsed.standard);
+  setVal('f-protocols-other', protocolsParsed.others);
+
+  const softwareParsed = parseListString(aff.software, SOFTWARE_LIST);
+  renderCheckboxGrid('f-software-grid', SOFTWARE_LIST, softwareParsed.standard);
+  setVal('f-software-other', softwareParsed.others);
+
+  const supervisorParsed = parseListString(aff.supervisor, SUPERVISOR_LIST);
+  renderCheckboxGrid('f-supervisor-grid', SUPERVISOR_LIST, supervisorParsed.standard);
+  setVal('f-supervisor-other', supervisorParsed.others);
+
   updateModelOptions();
   document.getElementById('affaire-modal').classList.add('open');
 }
@@ -2098,13 +2301,10 @@ function saveAffaire() {
     siteType: document.getElementById('f-site-type').value,
     brand: document.getElementById('f-brand').value,
     model: document.getElementById('f-model').value.trim(),
-    software: document.getElementById('f-software').value.trim(),
-    firmware: document.getElementById('f-firmware').value.trim(),
-    supervisor: document.getElementById('f-supervisor').value.trim(),
-    protocols: document.getElementById('f-protocols').value.trim(),
+    software: getSelectedFromGrid('f-software-grid', 'f-software-other'),
+    supervisor: getSelectedFromGrid('f-supervisor-grid', 'f-supervisor-other'),
+    protocols: getSelectedFromGrid('f-protocols-grid', 'f-protocols-other'),
     remote: document.getElementById('f-remote').value,
-    remote: document.getElementById('f-remote').value,
-    plcCount: parseInt(document.getElementById('f-plc-count').value) || null,
     address: document.getElementById('f-addr').value.trim(),
     lat: parseFloat(document.getElementById('f-lat').value) || null,
     lng: parseFloat(document.getElementById('f-lng').value) || null,
@@ -2210,15 +2410,76 @@ function deleteChapter(id) {
 function loadDefaultChapters() {
   const aff = affaires.find(a => a.id === activeId);
   if (!aff) return;
-  if ((aff.chapters || []).length > 0 && !confirm('Ajouter les chapitres GTB types aux chapitres existants ?')) return;
+  // Ouvrir le modal de sélection
+  renderDefaultChaptersList(true);
+  document.getElementById('default-chapters-modal').classList.add('open');
+}
+
+function renderDefaultChaptersList(allChecked = true) {
+  const list = document.getElementById('default-chapters-list');
+  list.innerHTML = DEFAULT_CHAPTERS.map((ch, i) => `
+    <label class="protocol-checkbox ${allChecked ? 'checked' : ''}" onclick="toggleProtocolCheckbox(this)" style="padding: 12px 14px;">
+      <input type="checkbox" data-index="${i}" ${allChecked ? 'checked' : ''}>
+      <span style="font-size:18px;margin-right:6px;">${ch.icon}</span>
+      <span style="font-size:14px;font-weight:500;">${escapeHtml(ch.title)}</span>
+    </label>
+  `).join('');
+}
+
+function toggleAllDefaultChapters(check) {
+  renderDefaultChaptersList(check);
+}
+
+function closeDefaultChaptersModal() {
+  document.getElementById('default-chapters-modal').classList.remove('open');
+}
+
+function confirmDefaultChapters() {
+  const aff = affaires.find(a => a.id === activeId);
+  if (!aff) return;
+
+  const checkedBoxes = document.querySelectorAll('#default-chapters-list input:checked');
+  if (checkedBoxes.length === 0) {
+    toast('Sélectionne au moins un chapitre', 'error');
+    return;
+  }
+
   if (!aff.chapters) aff.chapters = [];
-  DEFAULT_CHAPTERS.forEach(tpl => {
-    aff.chapters.push({ id: Date.now() + Math.random(), title: tpl.title, icon: tpl.icon, tasks: [], comments: [] });
+
+  // Filtrer les doublons par titre
+  const existingTitles = aff.chapters.map(c => c.title);
+  let addedCount = 0;
+  let skippedCount = 0;
+
+  checkedBoxes.forEach(cb => {
+    const index = parseInt(cb.dataset.index);
+    const tpl = DEFAULT_CHAPTERS[index];
+    if (existingTitles.includes(tpl.title)) {
+      skippedCount++;
+      return;
+    }
+    aff.chapters.push({
+      id: Date.now() + Math.random(),
+      title: tpl.title,
+      icon: tpl.icon,
+      tasks: [],
+      comments: [],
+    });
+    addedCount++;
   });
+
   saveData();
+  closeDefaultChaptersModal();
   renderSidebar();
   renderDetail();
-  toast('Chapitres GTB types ajoutés');
+
+  if (addedCount > 0 && skippedCount > 0) {
+    toast(`${addedCount} chapitre(s) ajouté(s), ${skippedCount} déjà présent(s)`, 'success');
+  } else if (addedCount > 0) {
+    toast(`${addedCount} chapitre(s) ajouté(s)`, 'success');
+  } else {
+    toast('Tous ces chapitres existent déjà', 'error');
+  }
 }
 
 function addTask(chapterId) {
