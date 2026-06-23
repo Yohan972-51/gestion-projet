@@ -1203,7 +1203,12 @@
           </div>
           <div class="form-group">
             <label class="form-label">Chargé d'affaire</label>
-            <input type="text" class="input" id="f-ca" placeholder="Nom">
+            <div style="display:flex;gap:6px;">
+              <select class="select" id="f-ca" style="flex:1;">
+                <option value="">— Aucun —</option>
+              </select>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="openCaManagerModal()" title="Gérer la liste des chargés d'affaire">⚙️</button>
+            </div>
           </div>
         </div>
         <div class="form-row">
@@ -1290,6 +1295,37 @@
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeBackupsModal()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal gestion chargés d'affaire -->
+<div class="modal-overlay" id="ca-manager-modal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-head">
+      <h3>👥 Gestion des chargés d'affaire</h3>
+      <button class="modal-close" onclick="closeCaManagerModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.15);border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--text-dim);">
+        💡 Crée la liste de ton équipe une fois pour toutes. Tu pourras ensuite choisir le chargé d'affaire dans une liste déroulante.
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Ajouter un chargé d'affaire</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" class="input" id="new-ca-input" placeholder="Nom (ex: Mathieu, JP, Thao...)" onkeydown="if(event.key==='Enter'){event.preventDefault();addCa();}">
+          <button type="button" class="btn" onclick="addCa()">＋ Ajouter</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Liste actuelle</label>
+        <div id="ca-list" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeCaManagerModal()">Fermer</button>
     </div>
   </div>
 </div>
@@ -2241,14 +2277,114 @@ function updateModelOptions() {
 }
 
 // ============ RENDER ============
+// ============ CHARGÉS D'AFFAIRE ============
+let chargesAffaireList = [];
+
+function loadChargesAffaire() {
+  try {
+    const raw = localStorage.getItem('autorem-charges');
+    if (raw) {
+      chargesAffaireList = JSON.parse(raw);
+    } else {
+      // Initialiser avec les CA présents dans les affaires existantes
+      const existing = [...new Set(affaires.map(a => (a.ca || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+      chargesAffaireList = existing;
+      saveChargesAffaire();
+    }
+  } catch(e) {
+    chargesAffaireList = [];
+  }
+}
+
+function saveChargesAffaire() {
+  try {
+    localStorage.setItem('autorem-charges', JSON.stringify(chargesAffaireList));
+  } catch(e) {}
+}
+
+function getAllChargesAffaire() {
+  // Combine la liste sauvegardée + ceux trouvés dans les affaires
+  const fromAffaires = affaires.map(a => (a.ca || '').trim()).filter(Boolean);
+  const combined = [...new Set([...chargesAffaireList, ...fromAffaires])];
+  return combined.sort((a, b) => a.localeCompare(b, 'fr'));
+}
+
+function openCaManagerModal() {
+  renderCaList();
+  document.getElementById('ca-manager-modal').classList.add('open');
+  setTimeout(() => document.getElementById('new-ca-input').focus(), 100);
+}
+
+function closeCaManagerModal() {
+  document.getElementById('ca-manager-modal').classList.remove('open');
+  // Mettre à jour le select dans le formulaire affaire si ouvert
+  populateCaSelect();
+}
+
+function renderCaList() {
+  const list = document.getElementById('ca-list');
+  const all = getAllChargesAffaire();
+  if (!all.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text-faint);padding:20px 10px;font-size:13px;">Aucun chargé d\'affaire dans la liste.</div>';
+    return;
+  }
+  list.innerHTML = all.map(ca => {
+    const usageCount = affaires.filter(a => (a.ca || '').trim() === ca).length;
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(8,47,73,0.4);border:1px solid rgba(34,211,238,0.1);border-radius:8px;">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:500;">👤 ${escapeHtml(ca)}</div>
+          <div style="font-family:'JetBrains Mono';font-size:10px;color:var(--text-faint);margin-top:2px;">${usageCount} affaire${usageCount > 1 ? 's' : ''}</div>
+        </div>
+        <button class="task-delete" onclick="removeCa('${ca.replace(/'/g, "\\'")}')">✕</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function addCa() {
+  const input = document.getElementById('new-ca-input');
+  const name = input.value.trim();
+  if (!name) return;
+  if (chargesAffaireList.includes(name) || getAllChargesAffaire().includes(name)) {
+    toast(`${name} est déjà dans la liste`, 'error');
+    return;
+  }
+  chargesAffaireList.push(name);
+  saveChargesAffaire();
+  input.value = '';
+  renderCaList();
+  toast(`${name} ajouté`, 'success');
+}
+
+function removeCa(name) {
+  const usageCount = affaires.filter(a => (a.ca || '').trim() === name).length;
+  let msg = `Supprimer "${name}" de la liste ?`;
+  if (usageCount > 0) {
+    msg += `\n\n⚠️ ${usageCount} affaire(s) lui sont assignée(s). Elles garderont son nom mais il disparaîtra de la liste déroulante.`;
+  }
+  if (!confirm(msg)) return;
+  chargesAffaireList = chargesAffaireList.filter(c => c !== name);
+  saveChargesAffaire();
+  renderCaList();
+  toast(`${name} retiré de la liste`, 'success');
+}
+
+function populateCaSelect() {
+  const select = document.getElementById('f-ca');
+  if (!select) return;
+  const currentValue = select.value;
+  const all = getAllChargesAffaire();
+  select.innerHTML = '<option value="">— Aucun —</option>' +
+    all.map(ca => `<option value="${escapeHtml(ca)}" ${ca === currentValue ? 'selected' : ''}>${escapeHtml(ca)}</option>`).join('');
+}
+
 function populateCaFilter() {
   const select = document.getElementById('ca-filter');
   if (!select) return;
 
-  // Récupérer tous les chargés d'affaire uniques (non vides), triés
-  const cas = [...new Set(
-    affaires.map(a => (a.ca || '').trim()).filter(Boolean)
-  )].sort((a, b) => a.localeCompare(b, 'fr'));
+  // Récupérer la liste complète (sauvegardés + utilisés dans les affaires)
+  const cas = getAllChargesAffaire();
 
   // Préserver la sélection actuelle si elle existe encore
   const currentValue = caFilter;
@@ -2654,6 +2790,7 @@ function openAffaireModal() {
   renderCheckboxGrid('f-protocols-grid', PROTOCOLS_LIST, []);
   renderCheckboxGrid('f-software-grid', SOFTWARE_LIST, []);
   renderCheckboxGrid('f-supervisor-grid', SUPERVISOR_LIST, []);
+  populateCaSelect();
   updateModelOptions();
   document.getElementById('affaire-modal').classList.add('open');
 }
@@ -2675,6 +2812,7 @@ function editAffaire(id) {
   setVal('f-lat', aff.lat);
   setVal('f-lng', aff.lng);
   setVal('f-client', aff.client);
+  populateCaSelect();
   setVal('f-ca', aff.ca);
   setVal('f-start-date', aff.startDate);
   setVal('f-end-date', aff.endDate);
@@ -3919,6 +4057,7 @@ function download(content, filename, type) {
 
 (async () => {
   loadData();
+  loadChargesAffaire();
   loadGcalSettings();
   if (activeId && !expandedChapters[activeId]) {
     expandedChapters[activeId] = new Set();
