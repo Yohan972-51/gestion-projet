@@ -11,6 +11,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <style>
   :root {
     --ocean: #0c4a6e;
@@ -259,6 +261,54 @@
     border-radius: 10px; font-size: 10px; color: var(--lagoon);
   }
 
+  /* ======= BACKUP ======= */
+  .backup-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: rgba(8, 47, 73, 0.4);
+    border: 1px solid rgba(34, 211, 238, 0.1);
+    border-radius: 10px;
+    transition: all 0.15s;
+  }
+
+  .backup-item:hover {
+    border-color: rgba(34, 211, 238, 0.25);
+    background: rgba(8, 47, 73, 0.55);
+  }
+
+  /* ======= FILTRE ======= */
+  .filter-zone {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: rgba(8, 47, 73, 0.35);
+    border: 1px solid rgba(34, 211, 238, 0.1);
+    border-radius: 10px;
+  }
+
+  .filter-label {
+    display: block;
+    font-family: 'JetBrains Mono';
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .filter-zone .select {
+    font-size: 12px;
+    padding: 7px 10px;
+  }
+
+  .filter-active-indicator {
+    display: inline-block;
+    margin-left: 6px;
+    color: var(--lagoon);
+    font-weight: 600;
+  }
+
   /* ======= AFFAIRE ITEMS ======= */
   .affaire-item {
     background: var(--glass);
@@ -348,6 +398,70 @@
     padding: 3px 8px; border-radius: 6px;
     font-family: 'JetBrains Mono'; font-size: 10px; color: var(--lagoon);
     margin-right: 4px; margin-bottom: 4px;
+  }
+
+  /* Protocols checkboxes grid */
+  .protocols-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .protocol-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(8, 47, 73, 0.4);
+    border: 1px solid rgba(34, 211, 238, 0.12);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 12px;
+    user-select: none;
+  }
+
+  .protocol-checkbox:hover {
+    border-color: rgba(34, 211, 238, 0.3);
+    background: rgba(34, 211, 238, 0.06);
+  }
+
+  .protocol-checkbox.checked {
+    border-color: var(--lagoon);
+    background: rgba(34, 211, 238, 0.12);
+    color: var(--lagoon);
+    font-weight: 600;
+  }
+
+  .protocol-checkbox input {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--text-faint);
+    border-radius: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    position: relative;
+    transition: all 0.15s;
+    margin: 0;
+  }
+
+  .protocol-checkbox input:checked {
+    background: var(--lagoon);
+    border-color: var(--lagoon);
+  }
+
+  .protocol-checkbox input:checked::after {
+    content: '✓';
+    position: absolute;
+    color: var(--ocean);
+    font-size: 11px;
+    font-weight: 700;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
   }
 
   /* ======= KPI ======= */
@@ -881,21 +995,21 @@
     </div>
   </div>
   <div class="topbar-actions">
-    <div id="sync-status" style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:0.5px;"></div>
+    <div id="sync-status" style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:0.5px;"><span style="color:var(--text-faint);">🔥 Temps réel</span></div>
     <div class="gcal-status" id="gcal-status">
       <span class="gcal-dot" id="gcal-dot"></span>
       <span id="gcal-status-text">Google : déconnecté</span>
     </div>
     <button class="btn btn-ghost btn-sm" onclick="openGcalSettings()" title="Configurer">⚙️</button>
     <button class="btn btn-ghost btn-sm" id="btn-gcal-connect" onclick="gcalConnect()" title="Se connecter à Google">🔗 Connexion</button>
-    <button class="btn btn-ghost btn-sm" id="btn-gcal-disconnect" onclick="gcalDisconnect()" style="display:none;" title="Se déconnecter de Google">🔓 Déco</button>
-    <button class="btn btn-sm" id="btn-cloud-push" onclick="forceCloudPush()" style="display:none;" title="Envoyer mes données vers le cloud">☁️ Envoyer ↑</button>
-    <button class="btn btn-ghost btn-sm" id="btn-cloud-pull" onclick="forceCloudPull()" style="display:none;" title="Récupérer les données depuis le cloud">☁️ Récupérer ↓</button>
-    <button class="btn btn-sm" id="btn-gcal-sync" onclick="gcalSyncAll()" style="display:none;" title="Synchroniser vers Google Calendar">📅 Sync Cal</button>
-    <button class="btn btn-ghost btn-sm" onclick="exportICS()" title="Export fichier ICS">📥</button>
-    <button class="btn btn-ghost btn-sm" onclick="exportJSON()" title="Sauvegarde JSON">💾</button>
-    <label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Importer un fichier JSON">
-      📂
+    <button class="btn btn-ghost btn-sm" id="btn-gcal-disconnect" onclick="gcalDisconnect()" style="display:none;" title="Se déconnecter">🔓</button>
+    <button class="btn btn-sm" id="btn-gcal-sync" onclick="gcalSyncAll()" style="display:none;" title="Sync Google Calendar">📅</button>
+    <button class="btn btn-sm" onclick="exportJSON()" title="Télécharger une sauvegarde sur ton PC maintenant" style="background:linear-gradient(135deg,#0ea5e9,#22d3ee);">💾 Sauvegarder</button>
+    <button class="btn btn-ghost btn-sm" id="btn-autobackup" onclick="toggleAutoBackup()" title="Sauvegarde automatique">⚪ Auto OFF</button>
+    <button class="btn btn-ghost btn-sm" id="btn-backup-folder" onclick="changeBackupFolder()" style="display:none;" title="Choisir le dossier de sauvegarde">📁 Choisir dossier</button>
+    <button class="btn btn-ghost btn-sm" onclick="openBackupsModal()" title="Voir les sauvegardes locales (5 dernières versions)">🕐 Historique</button>
+    <label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Restaurer depuis un fichier JSON">
+      📂 Restaurer
       <input type="file" accept=".json" onchange="importJSON(event)" style="display:none;">
     </label>
   </div>
@@ -908,6 +1022,12 @@
       <button class="view-tab" id="tab-planning" onclick="switchView('planning')">📅 Planning</button>
     </div>
     <button class="new-btn" onclick="openAffaireModal()">＋ Nouvelle affaire GTB</button>
+    <div class="filter-zone">
+      <label class="filter-label">🔍 Filtrer par chargé d'affaire</label>
+      <select class="select" id="ca-filter" onchange="updateCaFilter()">
+        <option value="">— Tous les chargés —</option>
+      </select>
+    </div>
     <div class="section-label">
       <span>Affaires</span>
       <span class="count-badge" id="count-badge">0</span>
@@ -1013,55 +1133,36 @@
             <datalist id="model-suggestions"></datalist>
           </div>
         </div>
-        <div class="form-row-3">
-          <div class="form-group">
-            <label class="form-label">Logiciel / Atelier</label>
-            <input type="text" class="input mono-input" id="f-software" placeholder="Unity Pro, TIA Portal, EBO...">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Version firmware</label>
-            <input type="text" class="input mono-input" id="f-firmware" placeholder="v2.14.3">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Superviseur</label>
-            <input type="text" class="input" id="f-supervisor" placeholder="Desigo CC, Niagara, EBO...">
-          </div>
+        <div class="form-group">
+          <label class="form-label">Logiciel / Atelier de programmation (cocher ceux utilisés)</label>
+          <div class="protocols-grid" id="f-software-grid"></div>
+          <input type="text" class="input mono-input" id="f-software-other" placeholder="Autres logiciels (séparés par des virgules)" style="margin-top:8px;font-size:11px;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Superviseur (cocher ceux utilisés)</label>
+          <div class="protocols-grid" id="f-supervisor-grid"></div>
+          <input type="text" class="input mono-input" id="f-supervisor-other" placeholder="Autres superviseurs (séparés par des virgules)" style="margin-top:8px;font-size:11px;">
         </div>
       </div>
 
       <div class="form-section">
         <div class="form-section-title">Architecture & Communication</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Protocoles bus</label>
-            <input type="text" class="input mono-input" id="f-protocols" placeholder="BACnet IP, Modbus RTU, KNX (virgules)">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Nombre de points I/O</label>
-            <input type="number" class="input" id="f-points" placeholder="128">
-          </div>
+        <div class="form-group">
+          <label class="form-label">Protocoles bus (cocher ceux utilisés)</label>
+          <div class="protocols-grid" id="f-protocols-grid"></div>
+          <input type="text" class="input mono-input" id="f-protocols-other" placeholder="Autres protocoles (séparés par des virgules)" style="margin-top:8px;font-size:11px;">
         </div>
-        <div class="form-row-3">
-          <div class="form-group">
-            <label class="form-label">IP automate</label>
-            <input type="text" class="input mono-input" id="f-ip" placeholder="192.168.1.10">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Accès distant</label>
-            <select class="select" id="f-remote">
-              <option value="">Aucun</option>
-              <option value="VPN">VPN</option>
-              <option value="TeamViewer">TeamViewer</option>
-              <option value="AnyDesk">AnyDesk</option>
-              <option value="IP publique">IP publique</option>
-              <option value="Cloud">Cloud constructeur</option>
-              <option value="Autre">Autre</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Nb d'automates</label>
-            <input type="number" class="input" id="f-plc-count" placeholder="1">
-          </div>
+        <div class="form-group">
+          <label class="form-label">Accès distant</label>
+          <select class="select" id="f-remote">
+            <option value="">Aucun</option>
+            <option value="VPN">VPN</option>
+            <option value="TeamViewer">TeamViewer</option>
+            <option value="AnyDesk">AnyDesk</option>
+            <option value="IP publique">IP publique</option>
+            <option value="Cloud">Cloud constructeur</option>
+            <option value="Autre">Autre</option>
+          </select>
         </div>
       </div>
 
@@ -1071,10 +1172,10 @@
         <div class="form-group">
           <label class="form-label">🔍 Rechercher un lieu / entreprise</label>
           <div style="position:relative;">
-            <input type="text" class="input" id="f-search-place" placeholder="Ex: Carrefour Collégien, Leroy Merlin Torcy, Hôpital Marne-la-Vallée..." oninput="debounceSearch()" onkeydown="handleSearchKey(event)" autocomplete="off">
+            <input type="text" class="input" id="f-search-place" placeholder="Ex: 25 rue de la Paix Paris, Carrefour Collégien, Hôpital Marne-la-Vallée..." oninput="debounceSearch()" onkeydown="handleSearchKey(event)" autocomplete="off">
             <div id="search-results" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--glass-strong);border:1px solid var(--primary);border-top:none;border-radius:0 0 8px 8px;max-height:260px;overflow-y:auto;box-shadow:0 12px 30px rgba(0,0,0,0.5);"></div>
           </div>
-          <div style="font-size:11px;color:var(--text-faint);margin-top:6px;">Tape le nom d'une entreprise, magasin, école, hôpital, usine... et sélectionne dans la liste</div>
+          <div style="font-size:11px;color:var(--text-faint);margin-top:6px;">Tape une adresse précise ou le nom d'une entreprise. Recherche dans 3 bases : 🇫🇷 BAN (gouvernement, ultra précis), 📍 Photon, 🌍 OpenStreetMap</div>
         </div>
 
         <div class="form-group">
@@ -1149,6 +1250,50 @@
   </div>
 </div>
 
+<!-- Modal sélection chapitres types -->
+<div class="modal-overlay" id="default-chapters-modal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-head">
+      <h3>Chapitres GTB à ajouter</h3>
+      <button class="modal-close" onclick="closeDefaultChaptersModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;">
+        Sélectionne les chapitres à ajouter à ton affaire :
+      </p>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button class="btn btn-ghost btn-sm" onclick="toggleAllDefaultChapters(true)">✓ Tout cocher</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleAllDefaultChapters(false)">✕ Tout décocher</button>
+      </div>
+      <div id="default-chapters-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeDefaultChaptersModal()">Annuler</button>
+      <button class="btn" onclick="confirmDefaultChapters()">Ajouter la sélection</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal historique des sauvegardes locales -->
+<div class="modal-overlay" id="backups-modal">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-head">
+      <h3>🕐 Historique des sauvegardes</h3>
+      <button class="modal-close" onclick="closeBackupsModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.15);border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--text-dim);">
+        💡 Les 5 dernières versions de tes données sont conservées automatiquement dans ton navigateur.
+        En plus, utilise <strong>💾 Sauvegarder</strong> régulièrement pour télécharger un fichier sur ton PC.
+      </div>
+      <div id="backups-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeBackupsModal()">Fermer</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal config Google Calendar -->
 <div class="modal-overlay" id="gcal-modal">
   <div class="modal" style="max-width:560px;">
@@ -1195,6 +1340,7 @@
 // ============ ÉTAT ============
 let affaires = [];
 let activeId = null;
+let caFilter = ''; // filtre par chargé d'affaire (vide = tous)
 let map = null;
 let editingId = null;
 let editingChapterId = null;
@@ -1248,15 +1394,13 @@ function initGcalClient() {
   try {
     gcalTokenClient = google.accounts.oauth2.initTokenClient({
       client_id: gcalClientId,
-      scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file',
+      scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events',
       callback: (tokenResponse) => {
         if (tokenResponse && tokenResponse.access_token) {
           gcalAccessToken = tokenResponse.access_token;
           gcalConnected = true;
           updateGcalUI(true);
-          toast('Connecté à Google — synchronisation...', 'success');
-          // Charger les données depuis Google Drive
-          loadFromCloud();
+          toast('Connecté à Google Calendar', 'success');
         } else {
           gcalConnected = false;
           updateGcalUI(false);
@@ -1283,8 +1427,6 @@ function updateGcalUI(connected, configured) {
   const btnConnect = document.getElementById('btn-gcal-connect');
   const btnDisconnect = document.getElementById('btn-gcal-disconnect');
   const btnSync = document.getElementById('btn-gcal-sync');
-  const btnPush = document.getElementById('btn-cloud-push');
-  const btnPull = document.getElementById('btn-cloud-pull');
 
   if (connected) {
     dot.classList.add('connected');
@@ -1293,8 +1435,6 @@ function updateGcalUI(connected, configured) {
     btnConnect.style.display = 'none';
     btnDisconnect.style.display = 'inline-flex';
     btnSync.style.display = 'inline-flex';
-    btnPush.style.display = 'inline-flex';
-    btnPull.style.display = 'inline-flex';
   } else if (configured) {
     dot.classList.remove('connected');
     text.textContent = 'Google : prêt';
@@ -1302,17 +1442,13 @@ function updateGcalUI(connected, configured) {
     btnConnect.style.display = 'inline-flex';
     btnDisconnect.style.display = 'none';
     btnSync.style.display = 'none';
-    btnPush.style.display = 'none';
-    btnPull.style.display = 'none';
   } else {
     dot.classList.remove('connected');
-    text.textContent = gcalClientId ? 'Google : déconnecté' : 'Non configuré';
+    text.textContent = gcalClientId ? 'Google : déconnecté' : '';
     text.style.color = 'var(--text-faint)';
     btnConnect.style.display = gcalClientId ? 'inline-flex' : 'none';
     btnDisconnect.style.display = 'none';
     btnSync.style.display = 'none';
-    btnPush.style.display = 'none';
-    btnPull.style.display = 'none';
   }
 }
 
@@ -1326,7 +1462,6 @@ function gcalDisconnect() {
   gcalAccessToken = null;
   gcalConnected = false;
   gcalTokenClient = null;
-  cloudFileId = null;
   googleEvents = [];
   googleEventsLoaded = false;
   updateGcalUI(false, true);
@@ -1505,14 +1640,91 @@ async function gcalSyncAll() {
 
 const CHAPTER_ICONS = ['⚙️','🔧','💻','📡','🖥️','🔌','⚡','📊','📋','🎛️','🛠️','🧰','🔩','📐','📝','✅','🔬','🧪','🔗','📁','🚦','🗄️','🧮','🔎'];
 
+// Liste des protocoles bus standards en GTB/CVC
+const PROTOCOLS_LIST = [
+  'BACnet IP',
+  'BACnet MS/TP',
+  'Modbus RTU',
+  'Modbus TCP',
+  'KNX',
+  'LON / LonWorks',
+  'M-Bus',
+  'M-Bus sans-fil',
+  'OPC UA',
+  'OPC DA',
+  'MQTT',
+  'EnOcean',
+  'DALI',
+  'DMX',
+  'Profibus',
+  'Profinet',
+  'EtherCAT',
+  'CANopen',
+  'IO-Link',
+  'Z-Wave',
+  'Zigbee',
+  'WMBus',
+];
+
+// Liste des logiciels/ateliers de programmation GTB
+const SOFTWARE_LIST = [
+  'EcoStruxure Control Expert',
+  'EcoStruxure Machine Expert',
+  'Unity Pro',
+  'TIA Portal',
+  'Step 7',
+  'Desigo XWorks Plus',
+  'Desigo Configuration Manager',
+  'ABT Site',
+  'CODESYS',
+  'WAGO e!COCKPIT',
+  'TwinCAT',
+  'Niagara Workbench',
+  'EBO (EcoStruxure Building Operation)',
+  'IRC Suite',
+  'Distech EC-gfxProgram',
+  'Metasys SCT',
+  'CASE Suite (Sauter)',
+  'CARE (Honeywell)',
+  'SaiaPCD Programming',
+  'LonMaker',
+  'ETS (KNX)',
+  'PG5 (Saia)',
+];
+
+// Liste des superviseurs GTB
+const SUPERVISOR_LIST = [
+  'Desigo CC',
+  'Desigo Insight',
+  'EBO (EcoStruxure Building Operation)',
+  'StruxureWare',
+  'Niagara N4',
+  'Niagara AX',
+  'Metasys',
+  'Distech EC-Net',
+  'Trend 963',
+  'Tridium Workbench',
+  'TAC Vista',
+  'Sauter Vision Center',
+  'Honeywell EBI',
+  'Honeywell WEBs',
+  'Priva TC Manager',
+  'Hubbard',
+  'Wit Topkapi',
+  'PcVue',
+  'Panorama',
+  'WinCC',
+  'iFix',
+  'SCADA WebVision',
+];
+
 const DEFAULT_CHAPTERS = [
-  { title: 'Analyse fonctionnelle', icon: '📋' },
-  { title: 'Programmation automate', icon: '💻' },
-  { title: 'Paramétrage superviseur', icon: '🖥️' },
-  { title: 'Intégration bus terrain', icon: '📡' },
-  { title: 'Raccordement & câblage', icon: '🔌' },
-  { title: 'Mise au point sur site', icon: '🔧' },
-  { title: 'Recette & PV', icon: '✅' },
+  { title: 'Analyse Fonctionnelle', icon: '📋' },
+  { title: 'Liste de points', icon: '📐' },
+  { title: 'Programme', icon: '💻' },
+  { title: 'Vue graphique', icon: '🖥️' },
+  { title: 'Mise en service', icon: '🔧' },
+  { title: 'Réception', icon: '✅' },
 ];
 
 // Modèles suggérés par marque
@@ -1538,427 +1750,434 @@ const MODEL_SUGGESTIONS = {
 
 // ============ STORAGE ============
 // Test si localStorage est disponible
-let storageAvailable = false;
-try {
-  localStorage.setItem('__test__', '1');
-  localStorage.removeItem('__test__');
-  storageAvailable = true;
-} catch(e) {
-  storageAvailable = false;
-}
+// ============ FIREBASE REALTIME DATABASE ============
+const firebaseConfig = {
+  apiKey: "AIzaSyAgfXgrKDMa-GyHhhN9XDVS1fSCu1KPdDg",
+  authDomain: "autorem-projet.firebaseapp.com",
+  databaseURL: "https://autorem-projet-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "autorem-projet",
+  storageBucket: "autorem-projet.firebasestorage.app",
+  messagingSenderId: "223745719407",
+  appId: "1:223745719407:web:1e67db658f10d3ee1fa19a",
+};
 
-let cloudSaving = false;
-let cloudFileId = null; // ID du fichier Autorem sur Google Drive
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const dbRef = db.ref('affaires');
+let firebaseReady = false;
 let saveTimeout = null;
-const CLOUD_FILENAME = 'autorem-data.json';
+let ignoreNextFirebaseUpdate = false;
 
 function loadData() {
+  // Charger depuis localStorage en attendant Firebase
   try {
-    if (storageAvailable) {
-      const raw = localStorage.getItem('autorem-data');
-      if (raw) {
-        const data = JSON.parse(raw);
-        affaires = data.affaires || [];
-        if (affaires.length > 0) activeId = affaires[0].id;
-        return;
-      }
+    const raw = localStorage.getItem('autorem-data');
+    if (raw) {
+      const data = JSON.parse(raw);
+      affaires = data.affaires || [];
+      if (affaires.length > 0) activeId = affaires[0].id;
     }
   } catch(e) {}
 
-  // Exemple par défaut
-  affaires = [{
-    id: Date.now(),
-    ref: 'GTB-2026-042',
-    name: 'Tour Alpha - Rénovation GTB',
-    siteType: 'Tertiaire',
-    address: '25 rue de la Défense, 92400 Courbevoie',
-    lat: 48.8924,
-    lng: 2.2403,
-    status: 'programmation',
-    brand: 'Schneider Electric',
-    model: 'Modicon M580',
-    software: 'EcoStruxure Control Expert',
-    firmware: 'v15.2',
-    supervisor: 'EcoStruxure Building Operation',
-    protocols: 'BACnet IP, Modbus RTU, KNX',
-    points: 480,
-    ip: '192.168.10.50',
-    remote: 'VPN',
-    plcCount: 3,
-    client: 'Foncière Alpha',
-    ca: 'Julien Martin',
-    startDate: '2026-01-10',
-    endDate: '2026-06-30',
-    createdAt: new Date().toISOString(),
-    chapters: [
-      {
-        id: 1001, title: 'Analyse fonctionnelle', icon: '📋',
-        tasks: [
-          { id: 1, text: 'Réception CCTP et plans CVC', done: true, date: '2026-01-15', priority: 'haute' },
-          { id: 2, text: 'Rédaction analyse fonctionnelle CTA', done: true, date: '2026-01-25', priority: 'haute' },
-          { id: 3, text: 'Validation AF par MOE', done: false, date: '2026-04-20', priority: 'haute' },
-        ],
-        comments: [
-          { id: 101, date: '2026-01-22T14:30:00Z', text: 'Points de consigne validés avec le bureau d\'étude. 6 CTA sur le site, 3 avec récupération d\'énergie.' },
-        ],
-      },
-      {
-        id: 1002, title: 'Programmation automate', icon: '💻',
-        tasks: [
-          { id: 4, text: 'Configuration hardware M580', done: true, date: '2026-02-05', priority: 'haute' },
-          { id: 5, text: 'Développement blocs CTA standards', done: true, date: '2026-02-20', priority: 'haute' },
-          { id: 6, text: 'Développement régulation cascade chaufferie', done: false, date: '2026-04-25', priority: 'haute' },
-          { id: 7, text: 'Programmation horloges et délestage', done: false, date: '2026-05-02', priority: 'moyenne' },
-        ],
-        comments: [
-          { id: 102, date: '2026-02-18T10:15:00Z', text: 'Bloc CTA v2.3 finalisé avec gestion free-cooling et free-chilling. Testé en simulation, OK.' },
-        ],
-      },
-      {
-        id: 1003, title: 'Paramétrage superviseur', icon: '🖥️',
-        tasks: [
-          { id: 8, text: 'Import BACnet points (480 pts)', done: false, date: '2026-05-10', priority: 'haute' },
-          { id: 9, text: 'Création synoptiques CTA', done: false, date: '2026-05-15', priority: 'moyenne' },
-          { id: 10, text: 'Paramétrage alarmes et consignation', done: false, date: '2026-05-20', priority: 'moyenne' },
-        ],
-        comments: [],
-      },
-      {
-        id: 1004, title: 'Mise au point sur site', icon: '🔧',
-        tasks: [
-          { id: 11, text: 'Forçage sorties TOR + vérification actionneurs', done: false, priority: 'haute' },
-          { id: 12, text: 'Calibration sondes analogiques', done: false, priority: 'moyenne' },
-          { id: 13, text: 'Tests régulation en charge', done: false, priority: 'haute' },
-        ],
-        comments: [],
-      },
-    ],
-  }];
-  activeId = affaires[0].id;
-  saveDataLocal();
+  // Si rien en local, charger l'exemple
+  if (!affaires.length) {
+    affaires = [{
+      id: Date.now(),
+      ref: 'GTB-2026-042',
+      name: 'Tour Alpha - Rénovation GTB',
+      siteType: 'Tertiaire',
+      address: '25 rue de la Défense, 92400 Courbevoie',
+      lat: 48.8924, lng: 2.2403,
+      status: 'programmation',
+      brand: 'Schneider Electric', model: 'Modicon M580',
+      software: 'EcoStruxure Control Expert',
+      supervisor: 'EcoStruxure Building Operation',
+      protocols: 'BACnet IP, Modbus RTU, KNX',
+      remote: 'VPN',
+      client: 'Foncière Alpha', ca: 'Julien Martin',
+      startDate: '2026-01-10', endDate: '2026-06-30',
+      createdAt: new Date().toISOString(),
+      chapters: [
+        { id: 1001, title: 'Analyse fonctionnelle', icon: '📋',
+          tasks: [
+            { id: 1, text: 'Réception CCTP et plans CVC', done: true, status: 'done', date: '2026-01-15', priority: 'haute' },
+            { id: 2, text: 'Rédaction analyse fonctionnelle CTA', done: true, status: 'done', date: '2026-01-25', priority: 'haute' },
+            { id: 3, text: 'Validation AF par MOE', done: false, status: 'not-started', date: '2026-04-20', priority: 'haute' },
+          ],
+          comments: [{ id: 101, date: '2026-01-22T14:30:00Z', text: 'Points de consigne validés avec le bureau d\'étude.' }],
+        },
+        { id: 1002, title: 'Programmation automate', icon: '💻',
+          tasks: [
+            { id: 4, text: 'Configuration hardware M580', done: true, status: 'done', date: '2026-02-05', priority: 'haute' },
+            { id: 5, text: 'Développement blocs CTA standards', done: true, status: 'done', date: '2026-02-20', priority: 'haute' },
+            { id: 6, text: 'Développement régulation cascade chaufferie', done: false, status: 'not-started', date: '2026-04-25', priority: 'haute' },
+          ],
+          comments: [],
+        },
+        { id: 1003, title: 'Mise au point sur site', icon: '🔧',
+          tasks: [
+            { id: 11, text: 'Forçage sorties TOR', done: false, status: 'not-started', priority: 'haute' },
+            { id: 12, text: 'Calibration sondes', done: false, status: 'not-started', priority: 'moyenne' },
+          ],
+          comments: [],
+        },
+      ],
+    }];
+    activeId = affaires[0].id;
+  }
+
+  // Écouter Firebase en temps réel
+  dbRef.on('value', (snapshot) => {
+    if (ignoreNextFirebaseUpdate) {
+      ignoreNextFirebaseUpdate = false;
+      return;
+    }
+    const data = snapshot.val();
+    if (data && Array.isArray(data)) {
+      affaires = data;
+      if (!activeId && affaires.length) activeId = affaires[0].id;
+      // Sauvegarder en local aussi
+      try { localStorage.setItem('autorem-data', JSON.stringify({ affaires })); } catch(e) {}
+      renderSidebar();
+      renderDetail();
+      if (currentView === 'planning') renderPlanning();
+      updateSyncStatus('saved');
+      firebaseReady = true;
+    }
+  }, (error) => {
+    console.error('Erreur Firebase:', error);
+    updateSyncStatus('error');
+  });
+
+  // Premier push si Firebase est vide
+  setTimeout(() => {
+    if (!firebaseReady && affaires.length) {
+      dbRef.set(affaires).then(() => {
+        firebaseReady = true;
+        updateSyncStatus('saved');
+        toast('🔥 Données synchronisées avec Firebase', 'success');
+      });
+    }
+  }, 3000);
 }
 
-// Sauvegarde locale (instantanée)
-function saveDataLocal() {
-  if (!storageAvailable) return;
-  try { localStorage.setItem('autorem-data', JSON.stringify({ affaires })); }
-  catch(e) { console.warn('Sauvegarde locale impossible:', e); }
-}
-
-// Sauvegarde combinée : locale immédiate + cloud avec délai
 function saveData() {
-  saveDataLocal();
-  // Sauvegarder dans le cloud avec un délai de 2s pour regrouper les modifications rapides
-  if (gcalConnected && gcalAccessToken) {
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => saveToCloud(), 2000);
-    updateSyncStatus('saving');
+  // Local immédiat
+  try { localStorage.setItem('autorem-data', JSON.stringify({ affaires })); } catch(e) {}
+
+  // Sauvegardes locales avec rotation (5 dernières versions)
+  saveLocalBackup();
+
+  // Firebase avec délai anti-spam
+  clearTimeout(saveTimeout);
+  updateSyncStatus('saving');
+  saveTimeout = setTimeout(() => {
+    ignoreNextFirebaseUpdate = true;
+    dbRef.set(affaires).then(() => {
+      updateSyncStatus('saved');
+    }).catch((err) => {
+      console.error('Erreur Firebase save:', err);
+      updateSyncStatus('error');
+    });
+  }, 1000);
+}
+
+// Sauvegardes locales avec rotation - garde les 5 dernières
+function saveLocalBackup() {
+  // Ne sauvegarder que s'il y a au moins une affaire (évite d'écraser avec du vide)
+  if (!affaires.length) return;
+
+  try {
+    const backups = JSON.parse(localStorage.getItem('autorem-backups') || '[]');
+    const newBackup = {
+      timestamp: new Date().toISOString(),
+      count: affaires.length,
+      data: affaires,
+    };
+    backups.unshift(newBackup);
+    // Garder les 5 dernières
+    const trimmed = backups.slice(0, 5);
+    localStorage.setItem('autorem-backups', JSON.stringify(trimmed));
+  } catch(e) {
+    console.warn('Backup local impossible:', e);
   }
 }
 
-// ============ GOOGLE DRIVE CLOUD SYNC ============
+function getLocalBackups() {
+  try {
+    return JSON.parse(localStorage.getItem('autorem-backups') || '[]');
+  } catch(e) {
+    return [];
+  }
+}
+
+function restoreBackup(index) {
+  const backups = getLocalBackups();
+  const backup = backups[index];
+  if (!backup) return;
+  if (!confirm(`Restaurer la sauvegarde du ${new Date(backup.timestamp).toLocaleString('fr-FR')} avec ${backup.count} affaire(s) ?\n\nLes données actuelles seront remplacées.`)) return;
+
+  affaires = backup.data;
+  activeId = affaires.length ? affaires[0].id : null;
+
+  // Save immédiatement la version restaurée
+  try { localStorage.setItem('autorem-data', JSON.stringify({ affaires })); } catch(e) {}
+  ignoreNextFirebaseUpdate = true;
+  dbRef.set(affaires);
+
+  renderSidebar();
+  renderDetail();
+  closeBackupsModal();
+  toast(`✓ ${backup.count} affaire(s) restaurée(s)`, 'success');
+}
+
+function openBackupsModal() {
+  const backups = getLocalBackups();
+  const list = document.getElementById('backups-list');
+
+  if (!backups.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text-faint);padding:30px 10px;font-size:13px;">Aucune sauvegarde locale pour le moment.<br>Les sauvegardes sont créées automatiquement à chaque modification.</div>';
+  } else {
+    list.innerHTML = backups.map((b, i) => {
+      const date = new Date(b.timestamp);
+      const diff = Math.round((Date.now() - date.getTime()) / 60000); // en minutes
+      let ago = '';
+      if (diff < 1) ago = 'à l\'instant';
+      else if (diff < 60) ago = `il y a ${diff} min`;
+      else if (diff < 1440) ago = `il y a ${Math.round(diff/60)} h`;
+      else ago = `il y a ${Math.round(diff/1440)} j`;
+
+      return `
+        <div class="backup-item">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;">${date.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</div>
+            <div style="font-family:'JetBrains Mono';font-size:10px;color:var(--text-faint);margin-top:3px;">${ago} · ${b.count} affaire${b.count > 1 ? 's' : ''}</div>
+          </div>
+          <button class="btn btn-sm" onclick="restoreBackup(${i})">Restaurer</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('backups-modal').classList.add('open');
+}
+
+function closeBackupsModal() {
+  document.getElementById('backups-modal').classList.remove('open');
+}
+
+// Sauvegarde automatique sur PC toutes les X minutes (par défaut désactivée)
+let autoBackupInterval = null;
+let backupFolderHandle = null; // Handle vers le dossier de sauvegarde (File System Access API)
+let backupSupported = 'showDirectoryPicker' in window;
+
+// Demander à l'utilisateur de choisir un dossier de sauvegarde
+async function selectBackupFolder() {
+  if (!backupSupported) {
+    toast('⚠️ Ton navigateur ne supporte pas la sélection de dossier (utilise Chrome/Edge). Le téléchargement classique sera utilisé.', 'error');
+    return null;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({
+      mode: 'readwrite',
+      startIn: 'documents',
+    });
+    backupFolderHandle = handle;
+    // Sauvegarder le handle dans IndexedDB pour le récupérer après rechargement
+    await saveFolderHandle(handle);
+    toast(`✓ Dossier sélectionné : ${handle.name}`, 'success');
+    return handle;
+  } catch(e) {
+    if (e.name !== 'AbortError') {
+      console.error('Erreur sélection dossier:', e);
+      toast('Erreur lors de la sélection du dossier', 'error');
+    }
+    return null;
+  }
+}
+
+// IndexedDB pour sauvegarder le handle du dossier
+function openHandleDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('autorem-handles', 1);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => resolve(req.result);
+    req.onupgradeneeded = (e) => {
+      e.target.result.createObjectStore('handles');
+    };
+  });
+}
+
+async function saveFolderHandle(handle) {
+  try {
+    const db = await openHandleDB();
+    const tx = db.transaction('handles', 'readwrite');
+    tx.objectStore('handles').put(handle, 'backup-folder');
+  } catch(e) { console.warn('Erreur saveFolderHandle:', e); }
+}
+
+async function loadFolderHandle() {
+  try {
+    const db = await openHandleDB();
+    return new Promise((resolve) => {
+      const req = db.transaction('handles').objectStore('handles').get('backup-folder');
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch(e) { return null; }
+}
+
+async function clearFolderHandle() {
+  try {
+    const db = await openHandleDB();
+    db.transaction('handles', 'readwrite').objectStore('handles').delete('backup-folder');
+  } catch(e) {}
+}
+
+// Vérifier que le handle est toujours utilisable (permission)
+async function verifyFolderHandle(handle) {
+  if (!handle) return false;
+  try {
+    const opts = { mode: 'readwrite' };
+    if ((await handle.queryPermission(opts)) === 'granted') return true;
+    if ((await handle.requestPermission(opts)) === 'granted') return true;
+    return false;
+  } catch(e) { return false; }
+}
+
+// Écrire un fichier dans le dossier sélectionné
+async function writeBackupToFolder(filename, content) {
+  if (!backupFolderHandle) return false;
+  const ok = await verifyFolderHandle(backupFolderHandle);
+  if (!ok) {
+    toast('⚠️ Permission perdue sur le dossier — re-sélectionne-le', 'error');
+    backupFolderHandle = null;
+    await clearFolderHandle();
+    return false;
+  }
+  try {
+    const fileHandle = await backupFolderHandle.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+    return true;
+  } catch(e) {
+    console.error('Erreur écriture dossier:', e);
+    return false;
+  }
+}
+
+async function performAutoBackup() {
+  if (!affaires.length) return;
+  const data = JSON.stringify({ affaires, exportedAt: new Date().toISOString(), version: 4, app: 'Autorem', auto: true }, null, 2);
+  const filename = `autorem-auto-${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.json`;
+
+  // Si on a un dossier sélectionné, écrire directement dedans
+  if (backupFolderHandle) {
+    const ok = await writeBackupToFolder(filename, data);
+    if (ok) {
+      toast(`💾 Sauvegarde auto → ${backupFolderHandle.name}`, 'success');
+      return;
+    }
+  }
+
+  // Fallback : téléchargement classique
+  download(data, filename, 'application/json');
+  toast('💾 Sauvegarde automatique téléchargée', 'success');
+}
+
+async function startAutoBackup() {
+  if (autoBackupInterval) clearInterval(autoBackupInterval);
+
+  // Si pas encore de dossier choisi et que le navigateur supporte, le proposer
+  if (!backupFolderHandle && backupSupported) {
+    const useFolderChoice = confirm(
+      'Veux-tu choisir un dossier de sauvegarde sur ton PC ?\n\n' +
+      '✓ OUI : sélectionner un dossier (recommandé — pas de spam dans Téléchargements)\n' +
+      '✕ NON : utiliser le dossier Téléchargements (par défaut)'
+    );
+    if (useFolderChoice) {
+      await selectBackupFolder();
+    }
+  }
+
+  // Toutes les 30 minutes : sauvegarde
+  autoBackupInterval = setInterval(performAutoBackup, 30 * 60 * 1000);
+  localStorage.setItem('autorem-autobackup', '1');
+
+  const dest = backupFolderHandle ? `dans "${backupFolderHandle.name}"` : 'dans Téléchargements';
+  toast(`✓ Sauvegarde auto activée (30 min) ${dest}`, 'success');
+}
+
+function stopAutoBackup() {
+  if (autoBackupInterval) clearInterval(autoBackupInterval);
+  autoBackupInterval = null;
+  localStorage.setItem('autorem-autobackup', '0');
+  toast('Sauvegarde auto désactivée', 'success');
+}
+
+async function toggleAutoBackup() {
+  if (autoBackupInterval) {
+    stopAutoBackup();
+  } else {
+    await startAutoBackup();
+  }
+  updateAutoBackupButton();
+}
+
+async function changeBackupFolder() {
+  const handle = await selectBackupFolder();
+  if (handle) {
+    updateAutoBackupButton();
+  }
+}
+
+function updateAutoBackupButton() {
+  const btn = document.getElementById('btn-autobackup');
+  const btnFolder = document.getElementById('btn-backup-folder');
+  if (!btn) return;
+  if (autoBackupInterval) {
+    btn.textContent = '🟢 Auto ON';
+    btn.title = backupFolderHandle
+      ? `Sauvegarde auto active dans : ${backupFolderHandle.name}\nClique pour désactiver`
+      : 'Sauvegarde auto active (Téléchargements)\nClique pour désactiver';
+  } else {
+    btn.textContent = '⚪ Auto OFF';
+    btn.title = 'Activer la sauvegarde auto toutes les 30 min';
+  }
+  if (btnFolder) {
+    if (backupFolderHandle) {
+      btnFolder.textContent = `📁 ${backupFolderHandle.name}`;
+      btnFolder.title = 'Changer le dossier de sauvegarde';
+      btnFolder.style.display = 'inline-flex';
+    } else if (backupSupported) {
+      btnFolder.textContent = '📁 Choisir dossier';
+      btnFolder.title = 'Choisir un dossier de sauvegarde sur ton PC';
+      btnFolder.style.display = 'inline-flex';
+    } else {
+      btnFolder.style.display = 'none';
+    }
+  }
+}
+
 function updateSyncStatus(status) {
   const el = document.getElementById('sync-status');
   if (!el) return;
   switch(status) {
     case 'saving':
-      el.innerHTML = '<span style="color:var(--warn);">☁️ Sync en cours...</span>';
+      el.innerHTML = '<span style="color:var(--warn);">🔥 Sync...</span>';
       break;
     case 'saved':
-      el.innerHTML = '<span style="color:var(--success);">☁️ Synchronisé ✓</span>';
+      el.innerHTML = '<span style="color:var(--success);">🔥 Synchro ✓</span>';
       setTimeout(() => {
-        if (el.innerHTML.includes('Synchronisé')) {
-          el.innerHTML = '<span style="color:var(--text-faint);">☁️ Cloud activé</span>';
-        }
+        if (el.innerHTML.includes('Synchro')) el.innerHTML = '<span style="color:var(--text-faint);">🔥 Temps réel</span>';
       }, 3000);
       break;
     case 'error':
-      el.innerHTML = '<span style="color:var(--danger);">☁️ Erreur sync</span>';
-      break;
-    case 'loading':
-      el.innerHTML = '<span style="color:var(--primary);">☁️ Chargement cloud...</span>';
+      el.innerHTML = '<span style="color:var(--danger);">🔥 Erreur sync</span>';
       break;
     default:
-      el.innerHTML = '<span style="color:var(--text-faint);">☁️ Cloud activé</span>';
-  }
-}
-
-// Trouver le fichier autorem-data.json sur Google Drive
-async function findCloudFile() {
-  try {
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=name='${CLOUD_FILENAME}'+and+trashed=false&fields=files(id,name,modifiedTime)`,
-      { headers: { 'Authorization': 'Bearer ' + gcalAccessToken } }
-    );
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('Erreur findCloudFile:', res.status, errText);
-      if (res.status === 403 || res.status === 401) {
-        toast('⚠️ Permission Google Drive refusée.\nDéconnecte-toi et reconnecte-toi pour réautoriser.', 'error');
-      }
-      return null;
-    }
-    const data = await res.json();
-    if (data.files && data.files.length > 0) {
-      data.files.sort((a, b) => new Date(b.modifiedTime) - new Date(a.modifiedTime));
-      cloudFileId = data.files[0].id;
-      return cloudFileId;
-    }
-    return null;
-  } catch(e) {
-    console.error('Erreur recherche fichier cloud:', e);
-    toast('Erreur réseau lors de la recherche cloud', 'error');
-    return null;
-  }
-}
-
-// Charger les données depuis Google Drive
-async function loadFromCloud() {
-  if (!gcalConnected || !gcalAccessToken) return;
-  
-  updateSyncStatus('loading');
-  
-  try {
-    // Chercher le fichier
-    const fileId = await findCloudFile();
-    
-    if (!fileId) {
-      // Pas de fichier cloud → on upload les données locales
-      toast('☁️ Première synchro — envoi de vos données vers le cloud', 'success');
-      await saveToCloud();
-      updateSyncStatus('saved');
-      return;
-    }
-
-    // Télécharger le contenu
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-      { headers: { 'Authorization': 'Bearer ' + gcalAccessToken } }
-    );
-    
-    if (!res.ok) {
-      updateSyncStatus('error');
-      toast('Erreur chargement depuis le cloud', 'error');
-      return;
-    }
-
-    const data = await res.json();
-    
-    if (data.affaires && Array.isArray(data.affaires)) {
-      // Comparer : cloud plus récent que local ?
-      const cloudTime = data.lastSaved ? new Date(data.lastSaved).getTime() : 0;
-      let localTime = 0;
-      try {
-        const localRaw = localStorage.getItem('autorem-data');
-        if (localRaw) {
-          const localData = JSON.parse(localRaw);
-          localTime = localData.lastSaved ? new Date(localData.lastSaved).getTime() : 0;
-        }
-      } catch(e) {}
-
-      if (cloudTime >= localTime || affaires.length <= 1) {
-        // Cloud est plus récent ou local a juste l'exemple → prendre cloud
-        affaires = data.affaires;
-        activeId = affaires.length ? affaires[0].id : null;
-        saveDataLocal();
-        renderSidebar();
-        renderDetail();
-        toast(`☁️ ${affaires.length} affaire(s) chargée(s) depuis le cloud`, 'success');
-      } else {
-        // Local est plus récent → demander
-        if (confirm(`Les données cloud (${data.affaires.length} affaires) sont plus anciennes que vos données locales (${affaires.length} affaires).\n\nVoulez-vous écraser vos données locales avec celles du cloud ?`)) {
-          affaires = data.affaires;
-          activeId = affaires.length ? affaires[0].id : null;
-          saveDataLocal();
-          renderSidebar();
-          renderDetail();
-          toast('☁️ Données cloud restaurées', 'success');
-        } else {
-          // Garder local et écraser le cloud
-          await saveToCloud();
-          toast('☁️ Données locales envoyées vers le cloud', 'success');
-        }
-      }
-    }
-    
-    updateSyncStatus('saved');
-    
-  } catch(e) {
-    console.error('Erreur loadFromCloud:', e);
-    updateSyncStatus('error');
-    toast('Erreur de synchronisation cloud', 'error');
-  }
-}
-
-// Sauvegarder les données vers Google Drive
-async function saveToCloud() {
-  if (!gcalConnected || !gcalAccessToken || cloudSaving) return;
-  cloudSaving = true;
-
-  try {
-    const content = JSON.stringify({
-      affaires,
-      lastSaved: new Date().toISOString(),
-      version: 5,
-      app: 'Autorem',
-    });
-
-    if (cloudFileId) {
-      // Mettre à jour le fichier existant
-      const res = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${cloudFileId}?uploadType=media`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Authorization': 'Bearer ' + gcalAccessToken,
-            'Content-Type': 'application/json',
-          },
-          body: content,
-        }
-      );
-      if (res.ok) {
-        updateSyncStatus('saved');
-      } else {
-        console.error('Erreur update cloud:', await res.text());
-        updateSyncStatus('error');
-      }
-    } else {
-      // Créer un nouveau fichier
-      const metadata = {
-        name: CLOUD_FILENAME,
-        mimeType: 'application/json',
-        description: 'Données Autorem - Suivi GTB',
-      };
-
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', new Blob([content], { type: 'application/json' }));
-
-      const res = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-        {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + gcalAccessToken },
-          body: form,
-        }
-      );
-
-      if (res.ok) {
-        const result = await res.json();
-        cloudFileId = result.id;
-        updateSyncStatus('saved');
-      } else {
-        console.error('Erreur création cloud:', await res.text());
-        updateSyncStatus('error');
-      }
-    }
-
-    // Mettre à jour le timestamp local aussi
-    if (storageAvailable) {
-      try {
-        localStorage.setItem('autorem-data', JSON.stringify({
-          affaires,
-          lastSaved: new Date().toISOString(),
-        }));
-      } catch(e) {}
-    }
-
-  } catch(e) {
-    console.error('Erreur saveToCloud:', e);
-    updateSyncStatus('error');
-  }
-  
-  cloudSaving = false;
-}
-
-// ============ BOUTONS SYNCHRO MANUELS ============
-
-// Forcer l'envoi des données locales vers le cloud
-async function forceCloudPush() {
-  if (!gcalConnected || !gcalAccessToken) {
-    toast('Connecte-toi d\'abord à Google', 'error');
-    return;
-  }
-  
-  if (!confirm(`Envoyer vos ${affaires.length} affaire(s) vers le cloud ?\n\nCeci écrasera les données cloud avec vos données locales.`)) return;
-  
-  updateSyncStatus('saving');
-  toast('☁️ Envoi vers le cloud...', 'success');
-  
-  try {
-    cloudFileId = null;
-    await findCloudFile();
-    await saveToCloud();
-    
-    if (cloudFileId) {
-      toast(`☁️ ${affaires.length} affaire(s) envoyée(s) vers le cloud ✓`, 'success');
-    } else {
-      toast('⚠️ Erreur lors de l\'envoi. Vérifie que l\'API Google Drive est activée et reconnecte-toi.', 'error');
-      updateSyncStatus('error');
-    }
-  } catch(e) {
-    console.error('Erreur forceCloudPush:', e);
-    toast('Erreur d\'envoi vers le cloud. Essaie de te déconnecter (🔓) puis reconnecter.', 'error');
-    updateSyncStatus('error');
-  }
-}
-
-// Forcer la récupération des données depuis le cloud
-async function forceCloudPull() {
-  if (!gcalConnected || !gcalAccessToken) {
-    toast('Connecte-toi d\'abord à Google', 'error');
-    return;
-  }
-  
-  updateSyncStatus('loading');
-  
-  try {
-    const fileId = await findCloudFile();
-    
-    if (!fileId) {
-      toast('Aucune donnée trouvée dans le cloud. Utilise "Envoyer ↑" d\'abord depuis le PC qui a tes données.', 'error');
-      updateSyncStatus('error');
-      return;
-    }
-
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-      { headers: { 'Authorization': 'Bearer ' + gcalAccessToken } }
-    );
-    
-    if (!res.ok) {
-      toast('Erreur de téléchargement depuis le cloud', 'error');
-      updateSyncStatus('error');
-      return;
-    }
-
-    const data = await res.json();
-    
-    if (!data.affaires || !Array.isArray(data.affaires)) {
-      toast('Fichier cloud invalide', 'error');
-      updateSyncStatus('error');
-      return;
-    }
-
-    const lastSaved = data.lastSaved ? new Date(data.lastSaved).toLocaleString('fr-FR') : 'date inconnue';
-    
-    if (!confirm(`${data.affaires.length} affaire(s) trouvée(s) dans le cloud.\nDernière sauvegarde : ${lastSaved}\n\nRemplacer vos données locales par celles du cloud ?`)) {
-      updateSyncStatus('saved');
-      return;
-    }
-
-    affaires = data.affaires;
-    activeId = affaires.length ? affaires[0].id : null;
-    saveDataLocal();
-    renderSidebar();
-    renderDetail();
-    updateSyncStatus('saved');
-    toast(`☁️ ${affaires.length} affaire(s) récupérée(s) depuis le cloud ✓`, 'success');
-    
-  } catch(e) {
-    console.error('Erreur forceCloudPull:', e);
-    toast('Erreur de récupération cloud', 'error');
-    updateSyncStatus('error');
+      el.innerHTML = '<span style="color:var(--text-faint);">🔥 Temps réel</span>';
   }
 }
 
@@ -2022,21 +2241,70 @@ function updateModelOptions() {
 }
 
 // ============ RENDER ============
+function populateCaFilter() {
+  const select = document.getElementById('ca-filter');
+  if (!select) return;
+
+  // Récupérer tous les chargés d'affaire uniques (non vides), triés
+  const cas = [...new Set(
+    affaires.map(a => (a.ca || '').trim()).filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b, 'fr'));
+
+  // Préserver la sélection actuelle si elle existe encore
+  const currentValue = caFilter;
+
+  select.innerHTML = '<option value="">— Tous les chargés —</option>' +
+    cas.map(ca => `<option value="${escapeHtml(ca)}" ${ca === currentValue ? 'selected' : ''}>${escapeHtml(ca)}</option>`).join('') +
+    '<option value="__none__"' + (currentValue === '__none__' ? ' selected' : '') + '>— Sans chargé d\'affaire —</option>';
+
+  // Si le CA filtré n'existe plus, le reset
+  if (currentValue && currentValue !== '__none__' && !cas.includes(currentValue)) {
+    caFilter = '';
+    select.value = '';
+  }
+}
+
+function updateCaFilter() {
+  caFilter = document.getElementById('ca-filter').value;
+  renderSidebar();
+}
+
+function getFilteredAffaires() {
+  if (!caFilter) return affaires;
+  if (caFilter === '__none__') {
+    return affaires.filter(a => !(a.ca || '').trim());
+  }
+  return affaires.filter(a => (a.ca || '').trim() === caFilter);
+}
+
 function renderSidebar() {
-  document.getElementById('count-badge').textContent = affaires.length;
+  populateCaFilter();
+  const filtered = getFilteredAffaires();
+  const badge = document.getElementById('count-badge');
+  const total = affaires.length;
+  badge.textContent = caFilter ? `${filtered.length}/${total}` : total;
+
   const list = document.getElementById('affaire-list');
   if (!affaires.length) {
     list.innerHTML = '<div style="text-align:center;color:var(--text-faint);font-size:12px;padding:30px 0;">Aucune affaire</div>';
     return;
   }
-  list.innerHTML = affaires.map(aff => {
+  if (!filtered.length) {
+    list.innerHTML = `
+      <div style="text-align:center;color:var(--text-faint);font-size:12px;padding:30px 0;">
+        Aucune affaire pour ce chargé<br>
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="document.getElementById('ca-filter').value='';updateCaFilter();">Réinitialiser le filtre</button>
+      </div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(aff => {
     const prog = getProgress(aff);
     const allTasks = (aff.chapters || []).flatMap(c => c.tasks || []);
     return `
       <div class="affaire-item ${aff.id === activeId ? 'active' : ''}" onclick="selectAffaire(${aff.id})">
         <div class="aff-head">
           <div style="min-width:0;flex:1;">
-            <div class="aff-ref">${escapeHtml(aff.ref) || '—'}</div>
+            <div class="aff-ref">${escapeHtml(aff.ref) || '—'}${aff.ca ? ' · 👤 ' + escapeHtml(aff.ca) : ''}</div>
             <div class="aff-name">${escapeHtml(aff.name)}</div>
           </div>
           <span class="status-pill status-${aff.status}">${aff.status.replace(/-/g, ' ')}</span>
@@ -2046,7 +2314,7 @@ function renderSidebar() {
         <div class="progress-track"><div class="progress-fill" style="width:${prog}%"></div></div>
         <div class="aff-foot">
           <span class="progress-pct">${prog}%</span>
-          <span style="font-family:'JetBrains Mono';font-size:10px;color:var(--text-faint);">${allTasks.filter(t => getTaskStatus(t) === 'done').length}/${allTasks.length} · ${aff.points || 0} pts</span>
+          <span style="font-family:'JetBrains Mono';font-size:10px;color:var(--text-faint);">${allTasks.filter(t => getTaskStatus(t) === 'done').length}/${allTasks.length}</span>
         </div>
       </div>
     `;
@@ -2084,7 +2352,6 @@ function renderDetail() {
           <div class="detail-automate-banner">
             <span style="font-weight:700;">⚙ ${escapeHtml(aff.brand || '—')}</span>
             ${aff.model ? `<span style="opacity:0.7;">/</span><span>${escapeHtml(aff.model)}</span>` : ''}
-            ${aff.firmware ? `<span style="opacity:0.5;">· FW ${escapeHtml(aff.firmware)}</span>` : ''}
           </div>
         </div>
         <div class="action-buttons">
@@ -2096,9 +2363,6 @@ function renderDetail() {
         <div class="meta-item"><div class="label">Type de site</div><div class="value">${escapeHtml(aff.siteType) || '—'}</div></div>
         <div class="meta-item"><div class="label">Atelier logiciel</div><div class="value mono">${escapeHtml(aff.software) || '—'}</div></div>
         <div class="meta-item"><div class="label">Superviseur</div><div class="value">${escapeHtml(aff.supervisor) || '—'}</div></div>
-        <div class="meta-item"><div class="label">Points I/O</div><div class="value mono">${aff.points || '—'}</div></div>
-        <div class="meta-item"><div class="label">Nb automates</div><div class="value mono">${aff.plcCount || '—'}</div></div>
-        <div class="meta-item"><div class="label">IP automate</div><div class="value mono">${escapeHtml(aff.ip) || '—'}</div></div>
         <div class="meta-item"><div class="label">Accès distant</div><div class="value">${escapeHtml(aff.remote) || '—'}</div></div>
         <div class="meta-item"><div class="label">Client</div><div class="value">${escapeHtml(aff.client) || '—'}</div></div>
         <div class="meta-item"><div class="label">Chargé d'affaire</div><div class="value">${escapeHtml(aff.ca) || '—'}</div></div>
@@ -2339,15 +2603,57 @@ function selectAffaire(id) {
   renderDetail();
 }
 
+// Fonction générique pour rendre une grille de checkboxes
+function renderCheckboxGrid(gridId, list, selectedItems = []) {
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  grid.innerHTML = list.map(item => {
+    const checked = selectedItems.includes(item);
+    return `
+      <label class="protocol-checkbox ${checked ? 'checked' : ''}" onclick="toggleProtocolCheckbox(this)">
+        <input type="checkbox" value="${escapeHtml(item)}" ${checked ? 'checked' : ''}>
+        <span>${escapeHtml(item)}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+function toggleProtocolCheckbox(label) {
+  const cb = label.querySelector('input');
+  setTimeout(() => {
+    label.classList.toggle('checked', cb.checked);
+  }, 0);
+}
+
+// Récupérer les éléments sélectionnés d'une grille + champ "autres"
+function getSelectedFromGrid(gridId, otherFieldId) {
+  const checked = Array.from(document.querySelectorAll(`#${gridId} input:checked`)).map(cb => cb.value);
+  const others = document.getElementById(otherFieldId).value
+    .split(',').map(s => s.trim()).filter(Boolean);
+  return [...checked, ...others].join(', ');
+}
+
+// Parser une chaîne pour séparer standard vs autres
+function parseListString(str, referenceList) {
+  if (!str) return { standard: [], others: '' };
+  const all = str.split(',').map(s => s.trim()).filter(Boolean);
+  const standard = all.filter(p => referenceList.includes(p));
+  const others = all.filter(p => !referenceList.includes(p)).join(', ');
+  return { standard, others };
+}
+
 function openAffaireModal() {
   editingId = null;
   document.getElementById('modal-title').textContent = 'Nouvelle affaire GTB';
-  ['f-name','f-ref','f-addr','f-lat','f-lng','f-model','f-software','f-firmware','f-supervisor','f-protocols','f-points','f-ip','f-plc-count','f-client','f-ca','f-start-date','f-end-date','f-search-place'].forEach(id => document.getElementById(id).value = '');
+  ['f-name','f-ref','f-addr','f-lat','f-lng','f-model','f-protocols-other','f-software-other','f-supervisor-other','f-client','f-ca','f-start-date','f-end-date','f-search-place'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-status').value = 'programmation';
   document.getElementById('f-site-type').value = 'Tertiaire';
   document.getElementById('f-brand').value = '';
   document.getElementById('f-remote').value = '';
   document.getElementById('geo-result').textContent = '';
+  renderCheckboxGrid('f-protocols-grid', PROTOCOLS_LIST, []);
+  renderCheckboxGrid('f-software-grid', SOFTWARE_LIST, []);
+  renderCheckboxGrid('f-supervisor-grid', SUPERVISOR_LIST, []);
   updateModelOptions();
   document.getElementById('affaire-modal').classList.add('open');
 }
@@ -2364,14 +2670,7 @@ function editAffaire(id) {
   setVal('f-site-type', aff.siteType || 'Tertiaire');
   setVal('f-brand', aff.brand);
   setVal('f-model', aff.model);
-  setVal('f-software', aff.software);
-  setVal('f-firmware', aff.firmware);
-  setVal('f-supervisor', aff.supervisor);
-  setVal('f-protocols', aff.protocols);
-  setVal('f-points', aff.points);
-  setVal('f-ip', aff.ip);
   setVal('f-remote', aff.remote);
-  setVal('f-plc-count', aff.plcCount);
   setVal('f-addr', aff.address);
   setVal('f-lat', aff.lat);
   setVal('f-lng', aff.lng);
@@ -2379,6 +2678,19 @@ function editAffaire(id) {
   setVal('f-ca', aff.ca);
   setVal('f-start-date', aff.startDate);
   setVal('f-end-date', aff.endDate);
+  // Parser et afficher les protocoles, logiciels, superviseurs
+  const protocolsParsed = parseListString(aff.protocols, PROTOCOLS_LIST);
+  renderCheckboxGrid('f-protocols-grid', PROTOCOLS_LIST, protocolsParsed.standard);
+  setVal('f-protocols-other', protocolsParsed.others);
+
+  const softwareParsed = parseListString(aff.software, SOFTWARE_LIST);
+  renderCheckboxGrid('f-software-grid', SOFTWARE_LIST, softwareParsed.standard);
+  setVal('f-software-other', softwareParsed.others);
+
+  const supervisorParsed = parseListString(aff.supervisor, SUPERVISOR_LIST);
+  renderCheckboxGrid('f-supervisor-grid', SUPERVISOR_LIST, supervisorParsed.standard);
+  setVal('f-supervisor-other', supervisorParsed.others);
+
   updateModelOptions();
   document.getElementById('affaire-modal').classList.add('open');
 }
@@ -2397,14 +2709,10 @@ function saveAffaire() {
     siteType: document.getElementById('f-site-type').value,
     brand: document.getElementById('f-brand').value,
     model: document.getElementById('f-model').value.trim(),
-    software: document.getElementById('f-software').value.trim(),
-    firmware: document.getElementById('f-firmware').value.trim(),
-    supervisor: document.getElementById('f-supervisor').value.trim(),
-    protocols: document.getElementById('f-protocols').value.trim(),
-    points: parseInt(document.getElementById('f-points').value) || null,
-    ip: document.getElementById('f-ip').value.trim(),
+    software: getSelectedFromGrid('f-software-grid', 'f-software-other'),
+    supervisor: getSelectedFromGrid('f-supervisor-grid', 'f-supervisor-other'),
+    protocols: getSelectedFromGrid('f-protocols-grid', 'f-protocols-other'),
     remote: document.getElementById('f-remote').value,
-    plcCount: parseInt(document.getElementById('f-plc-count').value) || null,
     address: document.getElementById('f-addr').value.trim(),
     lat: parseFloat(document.getElementById('f-lat').value) || null,
     lng: parseFloat(document.getElementById('f-lng').value) || null,
@@ -2510,15 +2818,76 @@ function deleteChapter(id) {
 function loadDefaultChapters() {
   const aff = affaires.find(a => a.id === activeId);
   if (!aff) return;
-  if ((aff.chapters || []).length > 0 && !confirm('Ajouter les chapitres GTB types aux chapitres existants ?')) return;
+  // Ouvrir le modal de sélection
+  renderDefaultChaptersList(true);
+  document.getElementById('default-chapters-modal').classList.add('open');
+}
+
+function renderDefaultChaptersList(allChecked = true) {
+  const list = document.getElementById('default-chapters-list');
+  list.innerHTML = DEFAULT_CHAPTERS.map((ch, i) => `
+    <label class="protocol-checkbox ${allChecked ? 'checked' : ''}" onclick="toggleProtocolCheckbox(this)" style="padding: 12px 14px;">
+      <input type="checkbox" data-index="${i}" ${allChecked ? 'checked' : ''}>
+      <span style="font-size:18px;margin-right:6px;">${ch.icon}</span>
+      <span style="font-size:14px;font-weight:500;">${escapeHtml(ch.title)}</span>
+    </label>
+  `).join('');
+}
+
+function toggleAllDefaultChapters(check) {
+  renderDefaultChaptersList(check);
+}
+
+function closeDefaultChaptersModal() {
+  document.getElementById('default-chapters-modal').classList.remove('open');
+}
+
+function confirmDefaultChapters() {
+  const aff = affaires.find(a => a.id === activeId);
+  if (!aff) return;
+
+  const checkedBoxes = document.querySelectorAll('#default-chapters-list input:checked');
+  if (checkedBoxes.length === 0) {
+    toast('Sélectionne au moins un chapitre', 'error');
+    return;
+  }
+
   if (!aff.chapters) aff.chapters = [];
-  DEFAULT_CHAPTERS.forEach(tpl => {
-    aff.chapters.push({ id: Date.now() + Math.random(), title: tpl.title, icon: tpl.icon, tasks: [], comments: [] });
+
+  // Filtrer les doublons par titre
+  const existingTitles = aff.chapters.map(c => c.title);
+  let addedCount = 0;
+  let skippedCount = 0;
+
+  checkedBoxes.forEach(cb => {
+    const index = parseInt(cb.dataset.index);
+    const tpl = DEFAULT_CHAPTERS[index];
+    if (existingTitles.includes(tpl.title)) {
+      skippedCount++;
+      return;
+    }
+    aff.chapters.push({
+      id: Date.now() + Math.random(),
+      title: tpl.title,
+      icon: tpl.icon,
+      tasks: [],
+      comments: [],
+    });
+    addedCount++;
   });
+
   saveData();
+  closeDefaultChaptersModal();
   renderSidebar();
   renderDetail();
-  toast('Chapitres GTB types ajoutés');
+
+  if (addedCount > 0 && skippedCount > 0) {
+    toast(`${addedCount} chapitre(s) ajouté(s), ${skippedCount} déjà présent(s)`, 'success');
+  } else if (addedCount > 0) {
+    toast(`${addedCount} chapitre(s) ajouté(s)`, 'success');
+  } else {
+    toast('Tous ces chapitres existent déjà', 'error');
+  }
 }
 
 function addTask(chapterId) {
@@ -3110,50 +3479,188 @@ function debounceSearch() {
 
 async function searchPlaces(query) {
   try {
-    // Recherche via Nominatim avec résultats détaillés
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=8&addressdetails=1&extratags=1&namedetails=1&q=${encodeURIComponent(query)}`;
-    const r = await fetch(url, {
-      headers: { 'Accept-Language': 'fr' }
-    });
-    const data = await r.json();
-    
-    if (!data || !data.length) {
+    // Stratégie : on lance en parallèle 3 sources
+    // 1. BAN (Base Adresse Nationale française) — ultra précis pour adresses FR
+    // 2. Photon (basé sur OSM, meilleur ranking que Nominatim pour les noms)
+    // 3. Nominatim — fallback pour requêtes mondiales / entreprises spécifiques
+
+    const [banResults, photonResults, nominatimResults] = await Promise.all([
+      searchBAN(query),
+      searchPhoton(query),
+      searchNominatim(query),
+    ]);
+
+    // Fusionner les résultats en dédupliquant par coordonnées arrondies
+    const merged = [];
+    const seen = new Set();
+
+    function addResults(results, priority) {
+      results.forEach(r => {
+        const key = `${r.lat.toFixed(4)}_${r.lng.toFixed(4)}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push({ ...r, _priority: priority });
+        }
+      });
+    }
+
+    // BAN en premier (le plus précis pour FR)
+    addResults(banResults, 1);
+    // Photon ensuite (bonne couverture entreprises)
+    addResults(photonResults, 2);
+    // Nominatim en dernier
+    addResults(nominatimResults, 3);
+
+    if (!merged.length) {
       showSearchEmpty(query);
       return;
     }
 
-    searchResults = data.map(item => {
-      // Extraire un nom propre si possible
+    // Trier par priorité puis par score
+    merged.sort((a, b) => a._priority - b._priority);
+
+    searchResults = merged.slice(0, 10);
+    searchHighlight = -1;
+    renderSearchResults();
+  } catch(e) {
+    console.error('Erreur recherche:', e);
+    showSearchEmpty(query);
+  }
+}
+
+// ===== API BAN (Base Adresse Nationale française) =====
+// Précision : adresse au numéro de rue près, données gouvernementales
+async function searchBAN(query) {
+  try {
+    const url = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5&autocomplete=1`;
+    const r = await fetch(url);
+    if (!r.ok) return [];
+    const data = await r.json();
+    if (!data.features) return [];
+    return data.features.map(feat => {
+      const p = feat.properties;
+      const c = feat.geometry.coordinates;
+      const typeMap = {
+        'housenumber': 'Adresse précise',
+        'street': 'Rue',
+        'locality': 'Lieu-dit',
+        'municipality': 'Commune',
+      };
+      return {
+        name: p.name || p.label.split(',')[0],
+        type: typeMap[p.type] || p.type,
+        address: p.label,
+        fullAddress: p.label,
+        lng: c[0],
+        lat: c[1],
+        precision: p.score, // 0-1, 1 = parfait
+        source: 'BAN',
+      };
+    });
+  } catch(e) {
+    console.warn('BAN error:', e);
+    return [];
+  }
+}
+
+// ===== API Photon (Komoot, basé sur OSM, meilleur ranking) =====
+// Précision : excellente pour entreprises et POI
+async function searchPhoton(query) {
+  try {
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=6&lang=fr`;
+    const r = await fetch(url);
+    if (!r.ok) return [];
+    const data = await r.json();
+    if (!data.features) return [];
+
+    const typeMap = {
+      'supermarket': 'Supermarché', 'shop': 'Commerce', 'office': 'Bureau',
+      'industrial': 'Industriel', 'commercial': 'Commercial', 'school': 'École',
+      'hospital': 'Hôpital', 'university': 'Université', 'hotel': 'Hôtel',
+      'retail': 'Commerce', 'warehouse': 'Entrepôt', 'mall': 'Centre commercial',
+      'apartments': 'Résidence', 'house': 'Maison', 'building': 'Bâtiment',
+      'townhall': 'Mairie', 'library': 'Bibliothèque',
+      'sports_centre': 'Centre sportif', 'swimming_pool': 'Piscine',
+      'pharmacy': 'Pharmacie', 'bank': 'Banque', 'restaurant': 'Restaurant',
+      'fast_food': 'Restauration rapide', 'kindergarten': 'Crèche',
+      'clinic': 'Clinique', 'doctors': 'Cabinet médical', 'church': 'Église',
+      'place_of_worship': 'Lieu de culte', 'fuel': 'Station-service',
+      'car_repair': 'Garage auto', 'college': 'Collège/Lycée',
+      'marketplace': 'Marché', 'cinema': 'Cinéma', 'theatre': 'Théâtre',
+      'museum': 'Musée', 'community_centre': 'Centre communal',
+      'house': 'Maison', 'residential': 'Résidentiel',
+    };
+
+    return data.features.map(feat => {
+      const p = feat.properties;
+      const c = feat.geometry.coordinates;
+      const type = typeMap[p.osm_value] || p.osm_value || p.type || '';
+      // Construire une adresse propre
+      const addrParts = [
+        p.housenumber, p.street,
+        p.postcode, p.city || p.town || p.village || p.county,
+      ].filter(Boolean);
+      const displayAddr = addrParts.length ? addrParts.join(' ') : (p.name || '');
+      const name = p.name || p.street || displayAddr.split(',')[0];
+      // Adresse complète
+      const fullParts = [
+        p.name,
+        [p.housenumber, p.street].filter(Boolean).join(' '),
+        [p.postcode, p.city || p.town || p.village].filter(Boolean).join(' '),
+        p.country,
+      ].filter(Boolean);
+      return {
+        name: name || '(sans nom)',
+        type,
+        address: displayAddr,
+        fullAddress: fullParts.join(', '),
+        lng: c[0],
+        lat: c[1],
+        source: 'Photon',
+      };
+    });
+  } catch(e) {
+    console.warn('Photon error:', e);
+    return [];
+  }
+}
+
+// ===== Nominatim (fallback) =====
+async function searchNominatim(query) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&namedetails=1&q=${encodeURIComponent(query)}`;
+    const r = await fetch(url, { headers: { 'Accept-Language': 'fr' } });
+    if (!r.ok) return [];
+    const data = await r.json();
+    if (!data.length) return [];
+
+    const typeMap = {
+      'supermarket': 'Supermarché', 'shop': 'Commerce', 'office': 'Bureau',
+      'industrial': 'Industriel', 'commercial': 'Commercial', 'school': 'École',
+      'hospital': 'Hôpital', 'university': 'Université', 'hotel': 'Hôtel',
+      'retail': 'Commerce', 'warehouse': 'Entrepôt', 'mall': 'Centre commercial',
+      'apartments': 'Résidence', 'house': 'Maison', 'building': 'Bâtiment',
+      'townhall': 'Mairie', 'library': 'Bibliothèque',
+      'sports_centre': 'Centre sportif', 'swimming_pool': 'Piscine',
+      'pharmacy': 'Pharmacie', 'bank': 'Banque', 'restaurant': 'Restaurant',
+      'fast_food': 'Restauration rapide', 'kindergarten': 'Crèche',
+      'clinic': 'Clinique', 'doctors': 'Cabinet médical', 'church': 'Église',
+      'place_of_worship': 'Lieu de culte', 'fuel': 'Station-service',
+      'car_repair': 'Garage auto', 'college': 'Collège/Lycée',
+      'marketplace': 'Marché', 'cinema': 'Cinéma', 'theatre': 'Théâtre',
+      'museum': 'Musée', 'community_centre': 'Centre communal',
+    };
+
+    return data.map(item => {
       let name = item.namedetails?.name || item.display_name.split(',')[0];
       let type = item.type || item.class || '';
-      
-      // Traduction des types courants
-      const typeMap = {
-        'supermarket': 'Supermarché', 'shop': 'Commerce', 'office': 'Bureau',
-        'industrial': 'Industriel', 'commercial': 'Commercial', 'school': 'École',
-        'hospital': 'Hôpital', 'university': 'Université', 'hotel': 'Hôtel',
-        'retail': 'Commerce', 'warehouse': 'Entrepôt', 'mall': 'Centre commercial',
-        'apartments': 'Résidence', 'house': 'Maison', 'building': 'Bâtiment',
-        'yes': item.class || '', 'townhall': 'Mairie', 'library': 'Bibliothèque',
-        'sports_centre': 'Centre sportif', 'swimming_pool': 'Piscine',
-        'pharmacy': 'Pharmacie', 'bank': 'Banque', 'restaurant': 'Restaurant',
-        'fast_food': 'Restauration rapide', 'kindergarten': 'Crèche',
-        'clinic': 'Clinique', 'doctors': 'Cabinet médical', 'church': 'Église',
-        'place_of_worship': 'Lieu de culte', 'fuel': 'Station-service',
-        'car_repair': 'Garage auto', 'college': 'Collège/Lycée',
-        'marketplace': 'Marché', 'cinema': 'Cinéma', 'theatre': 'Théâtre',
-        'museum': 'Musée', 'community_centre': 'Centre communal',
-      };
       type = typeMap[type] || type;
-
-      // Construire l'adresse propre
       const addr = item.address || {};
       const addrParts = [
         addr.house_number, addr.road,
         addr.postcode, addr.city || addr.town || addr.village || addr.municipality,
       ].filter(Boolean);
       const displayAddr = addrParts.length ? addrParts.join(' ') : item.display_name;
-
       return {
         name,
         type,
@@ -3161,15 +3668,12 @@ async function searchPlaces(query) {
         fullAddress: item.display_name,
         lat: parseFloat(item.lat),
         lng: parseFloat(item.lon),
-        osmType: item.class,
+        source: 'OSM',
       };
     });
-
-    searchHighlight = -1;
-    renderSearchResults();
   } catch(e) {
-    console.error('Erreur recherche:', e);
-    showSearchEmpty(query);
+    console.warn('Nominatim error:', e);
+    return [];
   }
 }
 
@@ -3180,13 +3684,27 @@ function renderSearchResults() {
     return;
   }
   container.style.display = 'block';
-  container.innerHTML = searchResults.map((r, i) => `
+  container.innerHTML = searchResults.map((r, i) => {
+    // Badge source
+    let sourceBadge = '';
+    if (r.source === 'BAN') {
+      const precision = r.precision ? ` ${Math.round(r.precision * 100)}%` : '';
+      sourceBadge = `<span class="search-result-type" style="background:rgba(52,211,153,0.15);color:#34d399;">🇫🇷 BAN${precision}</span>`;
+    } else if (r.source === 'Photon') {
+      sourceBadge = `<span class="search-result-type" style="background:rgba(34,211,238,0.15);color:#22d3ee;">📍 Photon</span>`;
+    } else if (r.source === 'OSM') {
+      sourceBadge = `<span class="search-result-type" style="background:rgba(148,163,184,0.15);color:#94a3b8;">🌍 OSM</span>`;
+    }
+    return `
     <div class="search-result-item ${i === searchHighlight ? 'highlighted' : ''}" onclick="selectSearchResult(${i})" onmouseenter="searchHighlight=${i};renderSearchResults();">
       <div class="search-result-name">${escapeHtml(r.name)}</div>
       <div class="search-result-addr">📍 ${escapeHtml(r.address)}</div>
-      ${r.type ? `<span class="search-result-type">${escapeHtml(r.type)}</span>` : ''}
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">
+        ${r.type ? `<span class="search-result-type">${escapeHtml(r.type)}</span>` : ''}
+        ${sourceBadge}
+      </div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 function selectSearchResult(index) {
@@ -3265,15 +3783,50 @@ async function geocodeAddress() {
   const addr = document.getElementById('f-addr').value.trim();
   if (!addr) { toast('Entre une adresse', 'error'); return; }
   const res = document.getElementById('geo-result');
-  res.textContent = '⏳ Recherche...';
+  res.textContent = '⏳ Recherche précise...';
   res.style.color = 'var(--text-dim)';
+
   try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(addr)}`);
-    const data = await r.json();
+    // 1. Essayer d'abord BAN (gouvernement FR, ultra précis)
+    try {
+      const r1 = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(addr)}&limit=1`);
+      if (r1.ok) {
+        const data = await r1.json();
+        if (data.features && data.features.length > 0) {
+          const feat = data.features[0];
+          document.getElementById('f-lat').value = feat.geometry.coordinates[1].toFixed(6);
+          document.getElementById('f-lng').value = feat.geometry.coordinates[0].toFixed(6);
+          const score = Math.round((feat.properties.score || 0) * 100);
+          res.textContent = `✓ Trouvé via BAN (précision ${score}%) — ${feat.properties.label}`;
+          res.style.color = 'var(--success)';
+          return;
+        }
+      }
+    } catch(e) { console.warn('BAN failed, fallback Photon'); }
+
+    // 2. Fallback Photon (international)
+    try {
+      const r2 = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(addr)}&limit=1&lang=fr`);
+      if (r2.ok) {
+        const data = await r2.json();
+        if (data.features && data.features.length > 0) {
+          const feat = data.features[0];
+          document.getElementById('f-lat').value = feat.geometry.coordinates[1].toFixed(6);
+          document.getElementById('f-lng').value = feat.geometry.coordinates[0].toFixed(6);
+          res.textContent = `✓ Trouvé via Photon — ${feat.properties.name || addr}`;
+          res.style.color = 'var(--success)';
+          return;
+        }
+      }
+    } catch(e) { console.warn('Photon failed, fallback Nominatim'); }
+
+    // 3. Fallback Nominatim
+    const r3 = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(addr)}`);
+    const data = await r3.json();
     if (data && data.length) {
       document.getElementById('f-lat').value = parseFloat(data[0].lat).toFixed(6);
       document.getElementById('f-lng').value = parseFloat(data[0].lon).toFixed(6);
-      res.textContent = '✓ Coordonnées trouvées';
+      res.textContent = '✓ Coordonnées trouvées (OSM)';
       res.style.color = 'var(--success)';
     } else {
       res.textContent = '✕ Adresse introuvable';
@@ -3364,7 +3917,7 @@ function download(content, filename, type) {
   URL.revokeObjectURL(url);
 }
 
-(() => {
+(async () => {
   loadData();
   loadGcalSettings();
   if (activeId && !expandedChapters[activeId]) {
@@ -3376,9 +3929,23 @@ function download(content, filename, type) {
   }
   renderSidebar();
   renderDetail();
-  if (!storageAvailable) {
-    toast('Mode hors-ligne : utilise Export/Import pour sauvegarder', 'error');
+
+  // Restaurer le handle du dossier de sauvegarde
+  if (backupSupported) {
+    const handle = await loadFolderHandle();
+    if (handle) {
+      backupFolderHandle = handle;
+    }
   }
+
+  // Restaurer l'état de la sauvegarde auto
+  if (localStorage.getItem('autorem-autobackup') === '1') {
+    // Ne pas redemander de dossier au démarrage, juste relancer l'intervalle
+    if (autoBackupInterval) clearInterval(autoBackupInterval);
+    autoBackupInterval = setInterval(performAutoBackup, 30 * 60 * 1000);
+  }
+  updateAutoBackupButton();
+
   // Init Google Calendar après que le script GIS soit chargé
   if (gcalClientId) {
     const waitGIS = setInterval(() => {
