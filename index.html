@@ -263,6 +263,25 @@
 
   /* ======= FILTRE ======= */
   .filter-zone {
+
+  .backup-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: rgba(8, 47, 73, 0.4);
+    border: 1px solid rgba(34, 211, 238, 0.1);
+    border-radius: 10px;
+    transition: all 0.15s;
+  }
+
+  .backup-item:hover {
+    border-color: rgba(34, 211, 238, 0.25);
+    background: rgba(8, 47, 73, 0.55);
+  }
+
+  /* ======= FILTRE ======= */
+  .filter-zone {
     margin-bottom: 16px;
     padding: 12px;
     background: rgba(8, 47, 73, 0.35);
@@ -987,9 +1006,11 @@
     <button class="btn btn-ghost btn-sm" id="btn-gcal-connect" onclick="gcalConnect()" title="Se connecter à Google">🔗 Connexion</button>
     <button class="btn btn-ghost btn-sm" id="btn-gcal-disconnect" onclick="gcalDisconnect()" style="display:none;" title="Se déconnecter">🔓</button>
     <button class="btn btn-sm" id="btn-gcal-sync" onclick="gcalSyncAll()" style="display:none;" title="Sync Google Calendar">📅</button>
-    <button class="btn btn-ghost btn-sm" onclick="exportJSON()" title="Sauvegarde JSON">💾</button>
-    <label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Importer un fichier JSON">
-      📂
+    <button class="btn btn-sm" onclick="exportJSON()" title="Télécharger une sauvegarde sur ton PC maintenant" style="background:linear-gradient(135deg,#0ea5e9,#22d3ee);">💾 Sauvegarder</button>
+    <button class="btn btn-ghost btn-sm" id="btn-autobackup" onclick="toggleAutoBackup()" title="Sauvegarde automatique">⚪ Auto OFF</button>
+    <button class="btn btn-ghost btn-sm" onclick="openBackupsModal()" title="Voir les sauvegardes locales (5 dernières versions)">🕐 Historique</button>
+    <label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Restaurer depuis un fichier JSON">
+      📂 Restaurer
       <input type="file" accept=".json" onchange="importJSON(event)" style="display:none;">
     </label>
   </div>
@@ -1250,6 +1271,26 @@
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeDefaultChaptersModal()">Annuler</button>
       <button class="btn" onclick="confirmDefaultChapters()">Ajouter la sélection</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal historique des sauvegardes locales -->
+<div class="modal-overlay" id="backups-modal">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-head">
+      <h3>🕐 Historique des sauvegardes</h3>
+      <button class="modal-close" onclick="closeBackupsModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.15);border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--text-dim);">
+        💡 Les 5 dernières versions de tes données sont conservées automatiquement dans ton navigateur.
+        En plus, utilise <strong>💾 Sauvegarder</strong> régulièrement pour télécharger un fichier sur ton PC.
+      </div>
+      <div id="backups-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeBackupsModal()">Fermer</button>
     </div>
   </div>
 </div>
@@ -1825,6 +1866,9 @@ function saveData() {
   // Local immédiat
   try { localStorage.setItem('autorem-data', JSON.stringify({ affaires })); } catch(e) {}
 
+  // Sauvegardes locales avec rotation (5 dernières versions)
+  saveLocalBackup();
+
   // Firebase avec délai anti-spam
   clearTimeout(saveTimeout);
   updateSyncStatus('saving');
@@ -1837,6 +1881,134 @@ function saveData() {
       updateSyncStatus('error');
     });
   }, 1000);
+}
+
+// Sauvegardes locales avec rotation - garde les 5 dernières
+function saveLocalBackup() {
+  // Ne sauvegarder que s'il y a au moins une affaire (évite d'écraser avec du vide)
+  if (!affaires.length) return;
+
+  try {
+    const backups = JSON.parse(localStorage.getItem('autorem-backups') || '[]');
+    const newBackup = {
+      timestamp: new Date().toISOString(),
+      count: affaires.length,
+      data: affaires,
+    };
+    backups.unshift(newBackup);
+    // Garder les 5 dernières
+    const trimmed = backups.slice(0, 5);
+    localStorage.setItem('autorem-backups', JSON.stringify(trimmed));
+  } catch(e) {
+    console.warn('Backup local impossible:', e);
+  }
+}
+
+function getLocalBackups() {
+  try {
+    return JSON.parse(localStorage.getItem('autorem-backups') || '[]');
+  } catch(e) {
+    return [];
+  }
+}
+
+function restoreBackup(index) {
+  const backups = getLocalBackups();
+  const backup = backups[index];
+  if (!backup) return;
+  if (!confirm(`Restaurer la sauvegarde du ${new Date(backup.timestamp).toLocaleString('fr-FR')} avec ${backup.count} affaire(s) ?\n\nLes données actuelles seront remplacées.`)) return;
+
+  affaires = backup.data;
+  activeId = affaires.length ? affaires[0].id : null;
+
+  // Save immédiatement la version restaurée
+  try { localStorage.setItem('autorem-data', JSON.stringify({ affaires })); } catch(e) {}
+  ignoreNextFirebaseUpdate = true;
+  dbRef.set(affaires);
+
+  renderSidebar();
+  renderDetail();
+  closeBackupsModal();
+  toast(`✓ ${backup.count} affaire(s) restaurée(s)`, 'success');
+}
+
+function openBackupsModal() {
+  const backups = getLocalBackups();
+  const list = document.getElementById('backups-list');
+
+  if (!backups.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text-faint);padding:30px 10px;font-size:13px;">Aucune sauvegarde locale pour le moment.<br>Les sauvegardes sont créées automatiquement à chaque modification.</div>';
+  } else {
+    list.innerHTML = backups.map((b, i) => {
+      const date = new Date(b.timestamp);
+      const diff = Math.round((Date.now() - date.getTime()) / 60000); // en minutes
+      let ago = '';
+      if (diff < 1) ago = 'à l\'instant';
+      else if (diff < 60) ago = `il y a ${diff} min`;
+      else if (diff < 1440) ago = `il y a ${Math.round(diff/60)} h`;
+      else ago = `il y a ${Math.round(diff/1440)} j`;
+
+      return `
+        <div class="backup-item">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;">${date.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</div>
+            <div style="font-family:'JetBrains Mono';font-size:10px;color:var(--text-faint);margin-top:3px;">${ago} · ${b.count} affaire${b.count > 1 ? 's' : ''}</div>
+          </div>
+          <button class="btn btn-sm" onclick="restoreBackup(${i})">Restaurer</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('backups-modal').classList.add('open');
+}
+
+function closeBackupsModal() {
+  document.getElementById('backups-modal').classList.remove('open');
+}
+
+// Sauvegarde automatique sur PC toutes les X minutes (par défaut désactivée)
+let autoBackupInterval = null;
+function startAutoBackup() {
+  if (autoBackupInterval) clearInterval(autoBackupInterval);
+  // Toutes les 30 minutes : télécharge un fichier sur le PC
+  autoBackupInterval = setInterval(() => {
+    if (affaires.length > 0) {
+      const data = JSON.stringify({ affaires, exportedAt: new Date().toISOString(), version: 4, app: 'Autorem', auto: true }, null, 2);
+      download(data, `autorem-auto-${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.json`, 'application/json');
+      toast('💾 Sauvegarde automatique téléchargée', 'success');
+    }
+  }, 30 * 60 * 1000);
+  localStorage.setItem('autorem-autobackup', '1');
+  toast('✓ Sauvegarde auto activée (toutes les 30 min)', 'success');
+}
+
+function stopAutoBackup() {
+  if (autoBackupInterval) clearInterval(autoBackupInterval);
+  autoBackupInterval = null;
+  localStorage.setItem('autorem-autobackup', '0');
+  toast('Sauvegarde auto désactivée', 'success');
+}
+
+function toggleAutoBackup() {
+  if (autoBackupInterval) {
+    stopAutoBackup();
+  } else {
+    startAutoBackup();
+  }
+  updateAutoBackupButton();
+}
+
+function updateAutoBackupButton() {
+  const btn = document.getElementById('btn-autobackup');
+  if (!btn) return;
+  if (autoBackupInterval) {
+    btn.textContent = '🟢 Auto ON';
+    btn.title = 'Désactiver la sauvegarde automatique (30 min)';
+  } else {
+    btn.textContent = '⚪ Auto OFF';
+    btn.title = 'Activer la sauvegarde automatique sur PC (téléchargement toutes les 30 min)';
+  }
 }
 
 function updateSyncStatus(status) {
@@ -3424,6 +3596,13 @@ function download(content, filename, type) {
   }
   renderSidebar();
   renderDetail();
+
+  // Restaurer l'état de la sauvegarde auto
+  if (localStorage.getItem('autorem-autobackup') === '1') {
+    startAutoBackup();
+  }
+  updateAutoBackupButton();
+
   // Init Google Calendar après que le script GIS soit chargé
   if (gcalClientId) {
     const waitGIS = setInterval(() => {
