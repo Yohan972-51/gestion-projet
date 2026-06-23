@@ -1006,6 +1006,7 @@
     <button class="btn btn-sm" id="btn-gcal-sync" onclick="gcalSyncAll()" style="display:none;" title="Sync Google Calendar">📅</button>
     <button class="btn btn-sm" onclick="exportJSON()" title="Télécharger une sauvegarde sur ton PC maintenant" style="background:linear-gradient(135deg,#0ea5e9,#22d3ee);">💾 Sauvegarder</button>
     <button class="btn btn-ghost btn-sm" id="btn-autobackup" onclick="toggleAutoBackup()" title="Sauvegarde automatique">⚪ Auto OFF</button>
+    <button class="btn btn-ghost btn-sm" id="btn-backup-folder" onclick="changeBackupFolder()" style="display:none;" title="Choisir le dossier de sauvegarde">📁 Choisir dossier</button>
     <button class="btn btn-ghost btn-sm" onclick="openBackupsModal()" title="Voir les sauvegardes locales (5 dernières versions)">🕐 Historique</button>
     <label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Restaurer depuis un fichier JSON">
       📂 Restaurer
@@ -1171,10 +1172,10 @@
         <div class="form-group">
           <label class="form-label">🔍 Rechercher un lieu / entreprise</label>
           <div style="position:relative;">
-            <input type="text" class="input" id="f-search-place" placeholder="Ex: Carrefour Collégien, Leroy Merlin Torcy, Hôpital Marne-la-Vallée..." oninput="debounceSearch()" onkeydown="handleSearchKey(event)" autocomplete="off">
+            <input type="text" class="input" id="f-search-place" placeholder="Ex: 25 rue de la Paix Paris, Carrefour Collégien, Hôpital Marne-la-Vallée..." oninput="debounceSearch()" onkeydown="handleSearchKey(event)" autocomplete="off">
             <div id="search-results" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--glass-strong);border:1px solid var(--primary);border-top:none;border-radius:0 0 8px 8px;max-height:260px;overflow-y:auto;box-shadow:0 12px 30px rgba(0,0,0,0.5);"></div>
           </div>
-          <div style="font-size:11px;color:var(--text-faint);margin-top:6px;">Tape le nom d'une entreprise, magasin, école, hôpital, usine... et sélectionne dans la liste</div>
+          <div style="font-size:11px;color:var(--text-faint);margin-top:6px;">Tape une adresse précise ou le nom d'une entreprise. Recherche dans 3 bases : 🇫🇷 BAN (gouvernement, ultra précis), 📍 Photon, 🌍 OpenStreetMap</div>
         </div>
 
         <div class="form-group">
@@ -1967,18 +1968,145 @@ function closeBackupsModal() {
 
 // Sauvegarde automatique sur PC toutes les X minutes (par défaut désactivée)
 let autoBackupInterval = null;
-function startAutoBackup() {
-  if (autoBackupInterval) clearInterval(autoBackupInterval);
-  // Toutes les 30 minutes : télécharge un fichier sur le PC
-  autoBackupInterval = setInterval(() => {
-    if (affaires.length > 0) {
-      const data = JSON.stringify({ affaires, exportedAt: new Date().toISOString(), version: 4, app: 'Autorem', auto: true }, null, 2);
-      download(data, `autorem-auto-${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.json`, 'application/json');
-      toast('💾 Sauvegarde automatique téléchargée', 'success');
+let backupFolderHandle = null; // Handle vers le dossier de sauvegarde (File System Access API)
+let backupSupported = 'showDirectoryPicker' in window;
+
+// Demander à l'utilisateur de choisir un dossier de sauvegarde
+async function selectBackupFolder() {
+  if (!backupSupported) {
+    toast('⚠️ Ton navigateur ne supporte pas la sélection de dossier (utilise Chrome/Edge). Le téléchargement classique sera utilisé.', 'error');
+    return null;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({
+      mode: 'readwrite',
+      startIn: 'documents',
+    });
+    backupFolderHandle = handle;
+    // Sauvegarder le handle dans IndexedDB pour le récupérer après rechargement
+    await saveFolderHandle(handle);
+    toast(`✓ Dossier sélectionné : ${handle.name}`, 'success');
+    return handle;
+  } catch(e) {
+    if (e.name !== 'AbortError') {
+      console.error('Erreur sélection dossier:', e);
+      toast('Erreur lors de la sélection du dossier', 'error');
     }
-  }, 30 * 60 * 1000);
+    return null;
+  }
+}
+
+// IndexedDB pour sauvegarder le handle du dossier
+function openHandleDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('autorem-handles', 1);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => resolve(req.result);
+    req.onupgradeneeded = (e) => {
+      e.target.result.createObjectStore('handles');
+    };
+  });
+}
+
+async function saveFolderHandle(handle) {
+  try {
+    const db = await openHandleDB();
+    const tx = db.transaction('handles', 'readwrite');
+    tx.objectStore('handles').put(handle, 'backup-folder');
+  } catch(e) { console.warn('Erreur saveFolderHandle:', e); }
+}
+
+async function loadFolderHandle() {
+  try {
+    const db = await openHandleDB();
+    return new Promise((resolve) => {
+      const req = db.transaction('handles').objectStore('handles').get('backup-folder');
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch(e) { return null; }
+}
+
+async function clearFolderHandle() {
+  try {
+    const db = await openHandleDB();
+    db.transaction('handles', 'readwrite').objectStore('handles').delete('backup-folder');
+  } catch(e) {}
+}
+
+// Vérifier que le handle est toujours utilisable (permission)
+async function verifyFolderHandle(handle) {
+  if (!handle) return false;
+  try {
+    const opts = { mode: 'readwrite' };
+    if ((await handle.queryPermission(opts)) === 'granted') return true;
+    if ((await handle.requestPermission(opts)) === 'granted') return true;
+    return false;
+  } catch(e) { return false; }
+}
+
+// Écrire un fichier dans le dossier sélectionné
+async function writeBackupToFolder(filename, content) {
+  if (!backupFolderHandle) return false;
+  const ok = await verifyFolderHandle(backupFolderHandle);
+  if (!ok) {
+    toast('⚠️ Permission perdue sur le dossier — re-sélectionne-le', 'error');
+    backupFolderHandle = null;
+    await clearFolderHandle();
+    return false;
+  }
+  try {
+    const fileHandle = await backupFolderHandle.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+    return true;
+  } catch(e) {
+    console.error('Erreur écriture dossier:', e);
+    return false;
+  }
+}
+
+async function performAutoBackup() {
+  if (!affaires.length) return;
+  const data = JSON.stringify({ affaires, exportedAt: new Date().toISOString(), version: 4, app: 'Autorem', auto: true }, null, 2);
+  const filename = `autorem-auto-${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.json`;
+
+  // Si on a un dossier sélectionné, écrire directement dedans
+  if (backupFolderHandle) {
+    const ok = await writeBackupToFolder(filename, data);
+    if (ok) {
+      toast(`💾 Sauvegarde auto → ${backupFolderHandle.name}`, 'success');
+      return;
+    }
+  }
+
+  // Fallback : téléchargement classique
+  download(data, filename, 'application/json');
+  toast('💾 Sauvegarde automatique téléchargée', 'success');
+}
+
+async function startAutoBackup() {
+  if (autoBackupInterval) clearInterval(autoBackupInterval);
+
+  // Si pas encore de dossier choisi et que le navigateur supporte, le proposer
+  if (!backupFolderHandle && backupSupported) {
+    const useFolderChoice = confirm(
+      'Veux-tu choisir un dossier de sauvegarde sur ton PC ?\n\n' +
+      '✓ OUI : sélectionner un dossier (recommandé — pas de spam dans Téléchargements)\n' +
+      '✕ NON : utiliser le dossier Téléchargements (par défaut)'
+    );
+    if (useFolderChoice) {
+      await selectBackupFolder();
+    }
+  }
+
+  // Toutes les 30 minutes : sauvegarde
+  autoBackupInterval = setInterval(performAutoBackup, 30 * 60 * 1000);
   localStorage.setItem('autorem-autobackup', '1');
-  toast('✓ Sauvegarde auto activée (toutes les 30 min)', 'success');
+
+  const dest = backupFolderHandle ? `dans "${backupFolderHandle.name}"` : 'dans Téléchargements';
+  toast(`✓ Sauvegarde auto activée (30 min) ${dest}`, 'success');
 }
 
 function stopAutoBackup() {
@@ -1988,24 +2116,47 @@ function stopAutoBackup() {
   toast('Sauvegarde auto désactivée', 'success');
 }
 
-function toggleAutoBackup() {
+async function toggleAutoBackup() {
   if (autoBackupInterval) {
     stopAutoBackup();
   } else {
-    startAutoBackup();
+    await startAutoBackup();
   }
   updateAutoBackupButton();
 }
 
+async function changeBackupFolder() {
+  const handle = await selectBackupFolder();
+  if (handle) {
+    updateAutoBackupButton();
+  }
+}
+
 function updateAutoBackupButton() {
   const btn = document.getElementById('btn-autobackup');
+  const btnFolder = document.getElementById('btn-backup-folder');
   if (!btn) return;
   if (autoBackupInterval) {
     btn.textContent = '🟢 Auto ON';
-    btn.title = 'Désactiver la sauvegarde automatique (30 min)';
+    btn.title = backupFolderHandle
+      ? `Sauvegarde auto active dans : ${backupFolderHandle.name}\nClique pour désactiver`
+      : 'Sauvegarde auto active (Téléchargements)\nClique pour désactiver';
   } else {
     btn.textContent = '⚪ Auto OFF';
-    btn.title = 'Activer la sauvegarde automatique sur PC (téléchargement toutes les 30 min)';
+    btn.title = 'Activer la sauvegarde auto toutes les 30 min';
+  }
+  if (btnFolder) {
+    if (backupFolderHandle) {
+      btnFolder.textContent = `📁 ${backupFolderHandle.name}`;
+      btnFolder.title = 'Changer le dossier de sauvegarde';
+      btnFolder.style.display = 'inline-flex';
+    } else if (backupSupported) {
+      btnFolder.textContent = '📁 Choisir dossier';
+      btnFolder.title = 'Choisir un dossier de sauvegarde sur ton PC';
+      btnFolder.style.display = 'inline-flex';
+    } else {
+      btnFolder.style.display = 'none';
+    }
   }
 }
 
@@ -3328,50 +3479,188 @@ function debounceSearch() {
 
 async function searchPlaces(query) {
   try {
-    // Recherche via Nominatim avec résultats détaillés
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=8&addressdetails=1&extratags=1&namedetails=1&q=${encodeURIComponent(query)}`;
-    const r = await fetch(url, {
-      headers: { 'Accept-Language': 'fr' }
-    });
-    const data = await r.json();
-    
-    if (!data || !data.length) {
+    // Stratégie : on lance en parallèle 3 sources
+    // 1. BAN (Base Adresse Nationale française) — ultra précis pour adresses FR
+    // 2. Photon (basé sur OSM, meilleur ranking que Nominatim pour les noms)
+    // 3. Nominatim — fallback pour requêtes mondiales / entreprises spécifiques
+
+    const [banResults, photonResults, nominatimResults] = await Promise.all([
+      searchBAN(query),
+      searchPhoton(query),
+      searchNominatim(query),
+    ]);
+
+    // Fusionner les résultats en dédupliquant par coordonnées arrondies
+    const merged = [];
+    const seen = new Set();
+
+    function addResults(results, priority) {
+      results.forEach(r => {
+        const key = `${r.lat.toFixed(4)}_${r.lng.toFixed(4)}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push({ ...r, _priority: priority });
+        }
+      });
+    }
+
+    // BAN en premier (le plus précis pour FR)
+    addResults(banResults, 1);
+    // Photon ensuite (bonne couverture entreprises)
+    addResults(photonResults, 2);
+    // Nominatim en dernier
+    addResults(nominatimResults, 3);
+
+    if (!merged.length) {
       showSearchEmpty(query);
       return;
     }
 
-    searchResults = data.map(item => {
-      // Extraire un nom propre si possible
+    // Trier par priorité puis par score
+    merged.sort((a, b) => a._priority - b._priority);
+
+    searchResults = merged.slice(0, 10);
+    searchHighlight = -1;
+    renderSearchResults();
+  } catch(e) {
+    console.error('Erreur recherche:', e);
+    showSearchEmpty(query);
+  }
+}
+
+// ===== API BAN (Base Adresse Nationale française) =====
+// Précision : adresse au numéro de rue près, données gouvernementales
+async function searchBAN(query) {
+  try {
+    const url = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5&autocomplete=1`;
+    const r = await fetch(url);
+    if (!r.ok) return [];
+    const data = await r.json();
+    if (!data.features) return [];
+    return data.features.map(feat => {
+      const p = feat.properties;
+      const c = feat.geometry.coordinates;
+      const typeMap = {
+        'housenumber': 'Adresse précise',
+        'street': 'Rue',
+        'locality': 'Lieu-dit',
+        'municipality': 'Commune',
+      };
+      return {
+        name: p.name || p.label.split(',')[0],
+        type: typeMap[p.type] || p.type,
+        address: p.label,
+        fullAddress: p.label,
+        lng: c[0],
+        lat: c[1],
+        precision: p.score, // 0-1, 1 = parfait
+        source: 'BAN',
+      };
+    });
+  } catch(e) {
+    console.warn('BAN error:', e);
+    return [];
+  }
+}
+
+// ===== API Photon (Komoot, basé sur OSM, meilleur ranking) =====
+// Précision : excellente pour entreprises et POI
+async function searchPhoton(query) {
+  try {
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=6&lang=fr`;
+    const r = await fetch(url);
+    if (!r.ok) return [];
+    const data = await r.json();
+    if (!data.features) return [];
+
+    const typeMap = {
+      'supermarket': 'Supermarché', 'shop': 'Commerce', 'office': 'Bureau',
+      'industrial': 'Industriel', 'commercial': 'Commercial', 'school': 'École',
+      'hospital': 'Hôpital', 'university': 'Université', 'hotel': 'Hôtel',
+      'retail': 'Commerce', 'warehouse': 'Entrepôt', 'mall': 'Centre commercial',
+      'apartments': 'Résidence', 'house': 'Maison', 'building': 'Bâtiment',
+      'townhall': 'Mairie', 'library': 'Bibliothèque',
+      'sports_centre': 'Centre sportif', 'swimming_pool': 'Piscine',
+      'pharmacy': 'Pharmacie', 'bank': 'Banque', 'restaurant': 'Restaurant',
+      'fast_food': 'Restauration rapide', 'kindergarten': 'Crèche',
+      'clinic': 'Clinique', 'doctors': 'Cabinet médical', 'church': 'Église',
+      'place_of_worship': 'Lieu de culte', 'fuel': 'Station-service',
+      'car_repair': 'Garage auto', 'college': 'Collège/Lycée',
+      'marketplace': 'Marché', 'cinema': 'Cinéma', 'theatre': 'Théâtre',
+      'museum': 'Musée', 'community_centre': 'Centre communal',
+      'house': 'Maison', 'residential': 'Résidentiel',
+    };
+
+    return data.features.map(feat => {
+      const p = feat.properties;
+      const c = feat.geometry.coordinates;
+      const type = typeMap[p.osm_value] || p.osm_value || p.type || '';
+      // Construire une adresse propre
+      const addrParts = [
+        p.housenumber, p.street,
+        p.postcode, p.city || p.town || p.village || p.county,
+      ].filter(Boolean);
+      const displayAddr = addrParts.length ? addrParts.join(' ') : (p.name || '');
+      const name = p.name || p.street || displayAddr.split(',')[0];
+      // Adresse complète
+      const fullParts = [
+        p.name,
+        [p.housenumber, p.street].filter(Boolean).join(' '),
+        [p.postcode, p.city || p.town || p.village].filter(Boolean).join(' '),
+        p.country,
+      ].filter(Boolean);
+      return {
+        name: name || '(sans nom)',
+        type,
+        address: displayAddr,
+        fullAddress: fullParts.join(', '),
+        lng: c[0],
+        lat: c[1],
+        source: 'Photon',
+      };
+    });
+  } catch(e) {
+    console.warn('Photon error:', e);
+    return [];
+  }
+}
+
+// ===== Nominatim (fallback) =====
+async function searchNominatim(query) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&namedetails=1&q=${encodeURIComponent(query)}`;
+    const r = await fetch(url, { headers: { 'Accept-Language': 'fr' } });
+    if (!r.ok) return [];
+    const data = await r.json();
+    if (!data.length) return [];
+
+    const typeMap = {
+      'supermarket': 'Supermarché', 'shop': 'Commerce', 'office': 'Bureau',
+      'industrial': 'Industriel', 'commercial': 'Commercial', 'school': 'École',
+      'hospital': 'Hôpital', 'university': 'Université', 'hotel': 'Hôtel',
+      'retail': 'Commerce', 'warehouse': 'Entrepôt', 'mall': 'Centre commercial',
+      'apartments': 'Résidence', 'house': 'Maison', 'building': 'Bâtiment',
+      'townhall': 'Mairie', 'library': 'Bibliothèque',
+      'sports_centre': 'Centre sportif', 'swimming_pool': 'Piscine',
+      'pharmacy': 'Pharmacie', 'bank': 'Banque', 'restaurant': 'Restaurant',
+      'fast_food': 'Restauration rapide', 'kindergarten': 'Crèche',
+      'clinic': 'Clinique', 'doctors': 'Cabinet médical', 'church': 'Église',
+      'place_of_worship': 'Lieu de culte', 'fuel': 'Station-service',
+      'car_repair': 'Garage auto', 'college': 'Collège/Lycée',
+      'marketplace': 'Marché', 'cinema': 'Cinéma', 'theatre': 'Théâtre',
+      'museum': 'Musée', 'community_centre': 'Centre communal',
+    };
+
+    return data.map(item => {
       let name = item.namedetails?.name || item.display_name.split(',')[0];
       let type = item.type || item.class || '';
-      
-      // Traduction des types courants
-      const typeMap = {
-        'supermarket': 'Supermarché', 'shop': 'Commerce', 'office': 'Bureau',
-        'industrial': 'Industriel', 'commercial': 'Commercial', 'school': 'École',
-        'hospital': 'Hôpital', 'university': 'Université', 'hotel': 'Hôtel',
-        'retail': 'Commerce', 'warehouse': 'Entrepôt', 'mall': 'Centre commercial',
-        'apartments': 'Résidence', 'house': 'Maison', 'building': 'Bâtiment',
-        'yes': item.class || '', 'townhall': 'Mairie', 'library': 'Bibliothèque',
-        'sports_centre': 'Centre sportif', 'swimming_pool': 'Piscine',
-        'pharmacy': 'Pharmacie', 'bank': 'Banque', 'restaurant': 'Restaurant',
-        'fast_food': 'Restauration rapide', 'kindergarten': 'Crèche',
-        'clinic': 'Clinique', 'doctors': 'Cabinet médical', 'church': 'Église',
-        'place_of_worship': 'Lieu de culte', 'fuel': 'Station-service',
-        'car_repair': 'Garage auto', 'college': 'Collège/Lycée',
-        'marketplace': 'Marché', 'cinema': 'Cinéma', 'theatre': 'Théâtre',
-        'museum': 'Musée', 'community_centre': 'Centre communal',
-      };
       type = typeMap[type] || type;
-
-      // Construire l'adresse propre
       const addr = item.address || {};
       const addrParts = [
         addr.house_number, addr.road,
         addr.postcode, addr.city || addr.town || addr.village || addr.municipality,
       ].filter(Boolean);
       const displayAddr = addrParts.length ? addrParts.join(' ') : item.display_name;
-
       return {
         name,
         type,
@@ -3379,15 +3668,12 @@ async function searchPlaces(query) {
         fullAddress: item.display_name,
         lat: parseFloat(item.lat),
         lng: parseFloat(item.lon),
-        osmType: item.class,
+        source: 'OSM',
       };
     });
-
-    searchHighlight = -1;
-    renderSearchResults();
   } catch(e) {
-    console.error('Erreur recherche:', e);
-    showSearchEmpty(query);
+    console.warn('Nominatim error:', e);
+    return [];
   }
 }
 
@@ -3398,13 +3684,27 @@ function renderSearchResults() {
     return;
   }
   container.style.display = 'block';
-  container.innerHTML = searchResults.map((r, i) => `
+  container.innerHTML = searchResults.map((r, i) => {
+    // Badge source
+    let sourceBadge = '';
+    if (r.source === 'BAN') {
+      const precision = r.precision ? ` ${Math.round(r.precision * 100)}%` : '';
+      sourceBadge = `<span class="search-result-type" style="background:rgba(52,211,153,0.15);color:#34d399;">🇫🇷 BAN${precision}</span>`;
+    } else if (r.source === 'Photon') {
+      sourceBadge = `<span class="search-result-type" style="background:rgba(34,211,238,0.15);color:#22d3ee;">📍 Photon</span>`;
+    } else if (r.source === 'OSM') {
+      sourceBadge = `<span class="search-result-type" style="background:rgba(148,163,184,0.15);color:#94a3b8;">🌍 OSM</span>`;
+    }
+    return `
     <div class="search-result-item ${i === searchHighlight ? 'highlighted' : ''}" onclick="selectSearchResult(${i})" onmouseenter="searchHighlight=${i};renderSearchResults();">
       <div class="search-result-name">${escapeHtml(r.name)}</div>
       <div class="search-result-addr">📍 ${escapeHtml(r.address)}</div>
-      ${r.type ? `<span class="search-result-type">${escapeHtml(r.type)}</span>` : ''}
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">
+        ${r.type ? `<span class="search-result-type">${escapeHtml(r.type)}</span>` : ''}
+        ${sourceBadge}
+      </div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 function selectSearchResult(index) {
@@ -3483,15 +3783,50 @@ async function geocodeAddress() {
   const addr = document.getElementById('f-addr').value.trim();
   if (!addr) { toast('Entre une adresse', 'error'); return; }
   const res = document.getElementById('geo-result');
-  res.textContent = '⏳ Recherche...';
+  res.textContent = '⏳ Recherche précise...';
   res.style.color = 'var(--text-dim)';
+
   try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(addr)}`);
-    const data = await r.json();
+    // 1. Essayer d'abord BAN (gouvernement FR, ultra précis)
+    try {
+      const r1 = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(addr)}&limit=1`);
+      if (r1.ok) {
+        const data = await r1.json();
+        if (data.features && data.features.length > 0) {
+          const feat = data.features[0];
+          document.getElementById('f-lat').value = feat.geometry.coordinates[1].toFixed(6);
+          document.getElementById('f-lng').value = feat.geometry.coordinates[0].toFixed(6);
+          const score = Math.round((feat.properties.score || 0) * 100);
+          res.textContent = `✓ Trouvé via BAN (précision ${score}%) — ${feat.properties.label}`;
+          res.style.color = 'var(--success)';
+          return;
+        }
+      }
+    } catch(e) { console.warn('BAN failed, fallback Photon'); }
+
+    // 2. Fallback Photon (international)
+    try {
+      const r2 = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(addr)}&limit=1&lang=fr`);
+      if (r2.ok) {
+        const data = await r2.json();
+        if (data.features && data.features.length > 0) {
+          const feat = data.features[0];
+          document.getElementById('f-lat').value = feat.geometry.coordinates[1].toFixed(6);
+          document.getElementById('f-lng').value = feat.geometry.coordinates[0].toFixed(6);
+          res.textContent = `✓ Trouvé via Photon — ${feat.properties.name || addr}`;
+          res.style.color = 'var(--success)';
+          return;
+        }
+      }
+    } catch(e) { console.warn('Photon failed, fallback Nominatim'); }
+
+    // 3. Fallback Nominatim
+    const r3 = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(addr)}`);
+    const data = await r3.json();
     if (data && data.length) {
       document.getElementById('f-lat').value = parseFloat(data[0].lat).toFixed(6);
       document.getElementById('f-lng').value = parseFloat(data[0].lon).toFixed(6);
-      res.textContent = '✓ Coordonnées trouvées';
+      res.textContent = '✓ Coordonnées trouvées (OSM)';
       res.style.color = 'var(--success)';
     } else {
       res.textContent = '✕ Adresse introuvable';
@@ -3582,7 +3917,7 @@ function download(content, filename, type) {
   URL.revokeObjectURL(url);
 }
 
-(() => {
+(async () => {
   loadData();
   loadGcalSettings();
   if (activeId && !expandedChapters[activeId]) {
@@ -3595,9 +3930,19 @@ function download(content, filename, type) {
   renderSidebar();
   renderDetail();
 
+  // Restaurer le handle du dossier de sauvegarde
+  if (backupSupported) {
+    const handle = await loadFolderHandle();
+    if (handle) {
+      backupFolderHandle = handle;
+    }
+  }
+
   // Restaurer l'état de la sauvegarde auto
   if (localStorage.getItem('autorem-autobackup') === '1') {
-    startAutoBackup();
+    // Ne pas redemander de dossier au démarrage, juste relancer l'intervalle
+    if (autoBackupInterval) clearInterval(autoBackupInterval);
+    autoBackupInterval = setInterval(performAutoBackup, 30 * 60 * 1000);
   }
   updateAutoBackupButton();
 
