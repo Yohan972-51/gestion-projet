@@ -1830,6 +1830,12 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const dbRef = db.ref('affaires');
 const auth = firebase.auth();
+
+// 🔐 SÉCURITÉ : Déconnexion automatique à chaque fermeture d'onglet/navigateur
+// L'utilisateur devra se reconnecter à chaque ouverture de l'app
+auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
+  .catch((err) => console.error('Erreur persistence:', err));
+
 let firebaseReady = false;
 let saveTimeout = null;
 let ignoreNextFirebaseUpdate = false;
@@ -1838,6 +1844,12 @@ let currentUser = null;
 // ============ AUTHENTIFICATION ============
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
+  // Force la sélection du compte + demande de mot de passe à chaque fois
+  provider.setCustomParameters({
+    prompt: 'select_account consent',
+  });
+
+  // Essayer d'abord la popup
   auth.signInWithPopup(provider)
     .then((result) => {
       currentUser = result.user;
@@ -1847,16 +1859,44 @@ function signInWithGoogle() {
       toast(`✓ Connecté en tant que ${currentUser.email}`, 'success');
     })
     .catch((error) => {
-      console.error('Erreur connexion:', error);
-      if (error.code === 'auth/popup-closed-by-user') {
-        toast('Connexion annulée', 'error');
-      } else if (error.code === 'auth/unauthorized-domain') {
-        toast('❌ Ce domaine n\'est pas autorisé dans Firebase. Va dans Firebase Console → Authentication → Settings → Authorized domains et ajoute yohan972-51.github.io', 'error');
+      console.error('Erreur connexion popup:', error);
+      // Si la popup est bloquée → fallback redirect
+      if (error.code === 'auth/popup-blocked' ||
+          error.code === 'auth/popup-closed-by-user' ||
+          error.code === 'auth/cancelled-popup-request' ||
+          error.code === 'auth/operation-not-supported-in-this-environment') {
+        console.log('Popup bloquée, basculement sur redirect...');
+        toast('Redirection vers Google...', 'success');
+        auth.signInWithRedirect(provider);
+        return;
+      }
+      if (error.code === 'auth/unauthorized-domain') {
+        alert('❌ Ce domaine n\'est pas autorisé dans Firebase.\n\nVa dans Firebase Console → Authentication → Settings → Authorized domains et ajoute :\nyohan972-51.github.io');
       } else {
         toast('Erreur de connexion : ' + error.message, 'error');
       }
     });
 }
+
+// Gérer le retour après un signInWithRedirect
+auth.getRedirectResult()
+  .then((result) => {
+    if (result && result.user) {
+      currentUser = result.user;
+      console.log('Connecté via redirect:', currentUser.email);
+      updateAuthUI();
+      hideLoginScreen();
+      toast(`✓ Connecté en tant que ${currentUser.email}`, 'success');
+    }
+  })
+  .catch((error) => {
+    if (error.code) {
+      console.error('Erreur redirect:', error);
+      if (error.code === 'auth/unauthorized-domain') {
+        alert('❌ Domaine non autorisé dans Firebase.\nAjoute yohan972-51.github.io dans Firebase Console → Authentication → Settings → Authorized domains');
+      }
+    }
+  });
 
 function signOutFirebase() {
   if (!confirm('Te déconnecter de Firebase ? Tu devras te reconnecter pour synchroniser tes données.')) return;
