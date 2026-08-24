@@ -1382,6 +1382,7 @@
               <option value="Honeywell">Honeywell</option>
               <option value="Delta Controls">Delta Controls</option>
               <option value="ABB">ABB</option>
+              <option value="ALC (Automated Logic)">ALC (Automated Logic)</option>
               <option value="Priva">Priva</option>
               <option value="Regin">Regin</option>
               <option value="Carel">Carel</option>
@@ -1991,6 +1992,7 @@ const SOFTWARE_LIST = [
   'ETS (KNX)',
   'PG5 (Saia)',
   'SET (Trend Control)',
+  'EIkon (ALC)',
 ];
 
 // Liste des superviseurs GTB
@@ -2005,6 +2007,7 @@ const SUPERVISOR_LIST = [
   'Distech EC-Net',
   'Trend 963',
   'IQ Vision (Trend Control)',
+  'WebCTRL (ALC)',
   'Tridium Workbench',
   'TAC Vista',
   'Sauter Vision Center',
@@ -2043,6 +2046,7 @@ const MODEL_SUGGESTIONS = {
   'Honeywell': ['ComfortPoint CP-IPC', 'WEBs-N4', 'Excel Web II', 'Spyder'],
   'Delta Controls': ['eBCON', 'DSC-1616E', 'DSM-RTR', 'O3-DIN-24'],
   'ABB': ['AC500', 'AC500-eCo', 'AC500-XC', 'AC500-S'],
+  'ALC (Automated Logic)': ['ME-LGR', 'ME-LGR25', 'LGR250', 'LGR1000', 'ZN141', 'ZN341', 'ZN551', 'M-Line', 'S-Line'],
   'Priva': ['Blue ID C4', 'Blue ID E-line', 'Priva TC Modular', 'Priva Compri HX'],
   'Regin': ['Corrigo E', 'EXOcompact', 'EXOflex', 'Optigo'],
   'Carel': ['c.pCO', 'pCO5+', 'pCO5 compact', 'µC3', 'MasterCella'],
@@ -4708,7 +4712,7 @@ function renderSearchResults() {
       sourceBadge = `<span class="search-result-type" style="background:rgba(148,163,184,0.15);color:#94a3b8;">🌍 OSM</span>`;
     }
     return `
-    <div class="search-result-item ${i === searchHighlight ? 'highlighted' : ''}" onclick="selectSearchResult(${i})" onmouseenter="searchHighlight=${i};renderSearchResults();">
+    <div class="search-result-item ${i === searchHighlight ? 'highlighted' : ''}" data-index="${i}" onmousedown="selectSearchResult(${i})">
       <div class="search-result-name">${escapeHtml(r.name)}</div>
       <div class="search-result-addr">📍 ${escapeHtml(r.address)}</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">
