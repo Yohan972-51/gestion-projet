@@ -2069,24 +2069,212 @@ const DEFAULT_CHAPTERS = [
 
 // Modèles suggérés par marque
 const MODEL_SUGGESTIONS = {
-  'Schneider Electric': ['Modicon M340', 'Modicon M580', 'Modicon M221', 'Modicon M241', 'Modicon M251', 'TAC Xenta 911', 'SmartX AS-P', 'SmartX AS-B'],
-  'Siemens': ['S7-1200', 'S7-1500', 'S7-300', 'S7-400', 'Desigo PXC3', 'Desigo PXC4', 'Desigo PXC5', 'LOGO!', 'PXC100-E.D'],
-  'Wago': ['PFC200', 'PFC100', '750-8212', '750-8216', '750-8217', 'Touch Panel 600'],
-  'Beckhoff': ['CX5130', 'CX5140', 'CX9020', 'CX8190', 'C6015'],
-  'Trend Controls': ['IQ4E', 'IQ4NC', 'IQVISION', 'IQECO', 'IQL'],
-  'Distech Controls': ['ECB-600', 'ECB-PTU', 'ECLYPSE APEX', 'ECLYPSE Connect', 'EC-BOS'],
-  'Johnson Controls': ['FX-PCA', 'FX-PCG', 'Metasys NAE', 'Metasys NCE', 'Metasys SNC'],
-  'Sauter': ['modu525', 'modu612', 'EY-modulo 5', 'ecos504', 'ecos505'],
-  'Honeywell': ['ComfortPoint CP-IPC', 'WEBs-N4', 'Excel Web II', 'Spyder'],
-  'Delta Controls': ['eBCON', 'DSC-1616E', 'DSM-RTR', 'O3-DIN-24'],
-  'ABB': ['AC500', 'AC500-eCo', 'AC500-XC', 'AC500-S'],
-  'ALC (Automated Logic)': ['ME-LGR', 'ME-LGR25', 'LGR250', 'LGR1000', 'ZN141', 'ZN341', 'ZN551', 'M-Line', 'S-Line'],
-  'Priva': ['Blue ID C4', 'Blue ID E-line', 'Priva TC Modular', 'Priva Compri HX'],
-  'Regin': ['Corrigo E', 'EXOcompact', 'EXOflex', 'Optigo'],
-  'Carel': ['c.pCO', 'pCO5+', 'pCO5 compact', 'µC3', 'MasterCella'],
-  'Belimo': ['Energy Valve', 'PRCA', 'PKCA'],
-  'Loytec': ['LINX-151', 'LINX-202', 'LIOB-584', 'LIOB-100'],
-  'Saia Burgess': ['PCD3.M5', 'PCD3.M6', 'PCD1.M2', 'PCD2.M5'],
+  'Schneider Electric': [
+    // Modicon (automates process)
+    'Modicon M340', 'Modicon M580', 'Modicon M580 Safety', 'Modicon M221', 'Modicon M241', 'Modicon M251', 'Modicon M258', 'Modicon M262', 'Modicon LMC058', 'Modicon Momentum', 'Modicon Quantum', 'Modicon Premium',
+    // SmartX / EcoStruxure (GTB)
+    'SmartX AS-P', 'SmartX AS-B', 'SmartX IP Controller', 'SmartX RP-C', 'SmartX MP-C',
+    // TAC / Xenta (ancien)
+    'TAC Xenta 121', 'TAC Xenta 281', 'TAC Xenta 282', 'TAC Xenta 283', 'TAC Xenta 300', 'TAC Xenta 401', 'TAC Xenta 411', 'TAC Xenta 421', 'TAC Xenta 471', 'TAC Xenta 511', 'TAC Xenta 731', 'TAC Xenta 901', 'TAC Xenta 911', 'TAC Xenta 913',
+    // Zelio
+    'Zelio Logic SR2', 'Zelio Logic SR3',
+    // Twido (ancien)
+    'Twido TWDLCAE40DRF', 'Twido TWDLCAA24DRF',
+  ],
+  'Siemens': [
+    // Simatic S7
+    'S7-1200', 'S7-1500', 'S7-1500F', 'S7-1500T', 'S7-300', 'S7-300F', 'S7-400', 'S7-400H', 'S7-200 SMART', 'LOGO! 8',
+    // ET200 (I/O distribués)
+    'ET200SP', 'ET200MP', 'ET200S', 'ET200M', 'ET200eco',
+    // Desigo (GTB)
+    'Desigo PXC00-E.D', 'Desigo PXC12-E.D', 'Desigo PXC22-E.D', 'Desigo PXC36-E.D', 'Desigo PXC50-E.D', 'Desigo PXC64-U', 'Desigo PXC100-E.D', 'Desigo PXC200-E.D', 'Desigo PXC3', 'Desigo PXC4', 'Desigo PXC5', 'Desigo PXR', 'Desigo RXM', 'Desigo RXC',
+    // Climatix
+    'Climatix POL687', 'Climatix POL638', 'Climatix POL6XX', 'Climatix POL904', 'Climatix IC',
+    // Synco (CVC résidentiel/petit tertiaire)
+    'Synco RMU', 'Synco RMK', 'Synco RMH', 'Synco RLU', 'Synco 700',
+  ],
+  'Wago': [
+    // PFC (automates Linux)
+    'PFC100 750-8101', 'PFC100 750-8102', 'PFC200 750-8202', 'PFC200 750-8203', 'PFC200 750-8206', 'PFC200 750-8207', 'PFC200 750-8212', 'PFC200 750-8213', 'PFC200 750-8216', 'PFC200 750-8217',
+    // Edge Controller
+    'Edge Controller 752-8303',
+    // 750 Series (ancien)
+    '750-841', '750-849', '750-880', '750-881', '750-890',
+    // Touch Panel
+    'Touch Panel 600 (TP 600)', 'Touch Panel 650', 'Touch Panel 700', 'Perspecto',
+    // Modules I/O couramment déclarés
+    '750-430 (8 DI)', '750-530 (8 DO)', '750-468 (4 AI)', '750-559 (4 AO)',
+  ],
+  'Beckhoff': [
+    // CX (Embedded PC)
+    'CX5010', 'CX5020', 'CX5130', 'CX5140', 'CX5230', 'CX5240', 'CX7000', 'CX8010', 'CX8090', 'CX8091', 'CX8180', 'CX8190', 'CX9020', 'CX9240',
+    // C-Series (IPC industriels)
+    'C6015', 'C6017', 'C6025', 'C6030', 'C6032', 'C6525',
+    // BC/BK (Bus Coupler ancien)
+    'BC9000', 'BC9100', 'BK9000', 'BK9100',
+    // EL Terminals (I/O)
+    'EK1100 EtherCAT Coupler', 'EL1008 (8 DI)', 'EL2008 (8 DO)', 'EL3064 (4 AI)', 'EL4034 (4 AO)',
+  ],
+  'Trend Controls': [
+    // IQ4 series (automates GTB actuels)
+    'IQ4E/8', 'IQ4E/12', 'IQ4E/16', 'IQ4E/24', 'IQ4E/96/XNC', 'IQ4NC', 'IQ41', 'IQ422', 'IQL',
+    // IQeco (petit tertiaire)
+    'IQeco33', 'IQeco37', 'IQeco39', 'IQeco41',
+    // IQ3 (ancien, encore très déployé)
+    'IQ3xcite/16', 'IQ3xcite/32', 'IQ3xcite/64', 'IQ3xcite/96', 'IQ3xact', 'IQ251', 'IQ252',
+    // Superviseur
+    'IQVISION', 'IQVIEW8', 'IQ View',
+    // XCITE I/O
+    'XCITE/IO/4UI/4DO', 'XCITE/IO/8UI', 'XCITE/IO/32',
+  ],
+  'Distech Controls': [
+    // ECLYPSE (gamme IP actuelle)
+    'ECLYPSE APEX', 'ECLYPSE Connect ECY-S1000', 'ECLYPSE Connect ECY-PTU', 'ECLYPSE VAV ECY-VAV', 'ECLYPSE Series Controller',
+    // ECB (BACnet MS/TP)
+    'ECB-203', 'ECB-300', 'ECB-400', 'ECB-410', 'ECB-600', 'ECB-PTU', 'ECB-VAV',
+    // ECL (LonWorks)
+    'ECL-203', 'ECL-300', 'ECL-410', 'ECL-600', 'ECL-PTU', 'ECL-VAV',
+    // EC-BOS / EC-Net (gateways)
+    'EC-BOS-6', 'EC-BOS-8', 'EC-BOS-AX', 'EC-Net AX',
+    // Allure (sondes communicantes)
+    'Allure EC-Smart-Vue', 'Allure UNITOUCH',
+  ],
+  'Johnson Controls': [
+    // Metasys (gamme actuelle)
+    'Metasys SNC25', 'Metasys SNC16', 'Metasys SNE10500', 'Metasys SNE11000', 'Metasys SNE22000', 'Metasys NAE35', 'Metasys NAE45', 'Metasys NAE55', 'Metasys NAE85', 'Metasys NCE25', 'Metasys NIE29', 'Metasys NIE55',
+    // Facility Explorer (FX)
+    'FX-PCA', 'FX-PCG', 'FX-PCX', 'FX-VMA', 'FX-15', 'FX-20', 'FX-40', 'FX-60', 'FX-80',
+    // Verasys (petit site)
+    'Verasys SC-ME', 'Verasys SCT',
+  ],
+  'Sauter': [
+    // modu Series (automates modulaires)
+    'modu525', 'modu612', 'modu680',
+    // EY-modulo 5 (actuel)
+    'EY-modulo 5 ecos504', 'EY-modulo 5 ecos505', 'EY-modulo 5 ecos506', 'EY-modulo 5 ecos508', 'EY-modulo 5 modu524', 'EY-modulo 5 modu525', 'EY-modulo 5 modu526',
+    // EY-modulo 2 (ancien)
+    'EY-modulo 2 EYR203', 'EY-modulo 2 EYR207',
+    // flexotron / nova
+    'flexotron 400', 'flexotron 800', 'nova 220', 'nova 230', 'nova 240',
+    // Vision Center / Case Suite
+    'moduWeb Vision',
+  ],
+  'Honeywell': [
+    // Centraline (basé Niagara)
+    'Centraline Hawk', 'Centraline Falcon', 'Centraline Eagle',
+    // ComfortPoint
+    'ComfortPoint CP-IPC', 'ComfortPoint CP-PGM', 'ComfortPoint CP-UPC', 'ComfortPoint Open',
+    // Excel (ancien très répandu)
+    'Excel 5000', 'Excel 50', 'Excel 100', 'Excel 500', 'Excel 600', 'Excel Smart', 'Excel Web', 'Excel Web II', 'Excel Web II XL',
+    // Spyder (VAV / zone)
+    'Spyder PUB1012S', 'Spyder PUB4024S', 'Spyder PVB4024NS', 'Spyder Micro',
+    // Niagara WEBs
+    'WEBs-N4', 'WEBs-AX', 'WEB-8000',
+    // Stryker
+    'Stryker VAV', 'Stryker FCU',
+  ],
+  'Delta Controls': [
+    // enteliBUS (modulaire)
+    'enteliBUS eBMGR', 'enteliBUS eBCON', 'enteliBUS eBMGR-TCH', 'enteliBUS eBPGM',
+    // DSC Series (BACnet)
+    'DSC-1616E', 'DSC-1280E', 'DSC-1146E', 'DSC-1180E',
+    // DSM
+    'DSM-RTR', 'DSM-ES',
+    // O3 (zone / salle)
+    'O3-DIN-24', 'O3-DIN-12', 'O3-HPO-U',
+    // enteliTOUCH
+    'enteliTOUCH 7', 'enteliTOUCH 10',
+  ],
+  'ABB': [
+    // AC500 (automates PLC)
+    'AC500 PM554', 'AC500 PM564', 'AC500 PM573', 'AC500 PM583', 'AC500 PM590', 'AC500 PM591', 'AC500 PM592',
+    // AC500-eCo (compact)
+    'AC500-eCo PM554', 'AC500-eCo PM556',
+    // AC500 variantes
+    'AC500-XC', 'AC500-S Safety', 'AC500-redundant',
+    // AC800 (process)
+    'AC800M', 'AC800F',
+    // ABB i-bus KNX (GTB)
+    'IPR/S 3.5.1', 'IPS/S 3.1.1', 'DG/S 8.1', 'SA/S 8.16',
+    // Freelance
+    'Freelance AC900F',
+  ],
+  'ALC (Automated Logic)': [
+    // Routeurs / Globaux
+    'LGR250', 'LGR1000', 'LGR25', 'ME-LGR', 'ME-LGR25',
+    // ZN (zone BACnet MS/TP)
+    'ZN141', 'ZN341', 'ZN551', 'ZN141v+', 'ZN341v+', 'ZN551v+',
+    // VAV / RTU
+    'VAV-OPN', 'VAV-ARC', 'VAV-BOX', 'VPB-VAV',
+    // M-Line / S-Line
+    'ME812u', 'ME814u', 'ME816u', 'M-Line', 'S-Line',
+    // S6000 (ancien)
+    'S6000', 'U-Line',
+    // IEC I/O
+    'OF Series (OF-168, OF-836)',
+  ],
+  'Priva': [
+    // Blue ID (gamme actuelle)
+    'Blue ID C4', 'Blue ID C4-N', 'Blue ID C6', 'Blue ID E-line', 'Blue ID S10', 'Blue ID S37', 'Blue ID X-line',
+    // Compri HX / TC
+    'Compri HX', 'Compri HX 4', 'Compri HX 6', 'Compri HX 8', 'Compri HX 20',
+    // TC Modular
+    'Priva TC Modular',
+    // Automates serre / horticole
+    'Connext', 'Computer Plus',
+  ],
+  'Regin': [
+    // Corrigo (gamme CVC)
+    'Corrigo E 15', 'Corrigo E 28', 'Corrigo E Ventilation', 'Corrigo E Heating', 'Corrigo E Boiler', 'Corrigo Ardo',
+    // EXO (automates GTB)
+    'EXOcompact', 'EXOflex', 'EXO4', 'EXOrealC', 'EXOscada',
+    // Optigo (modulaire)
+    'Optigo OP10', 'Optigo OP5-S', 'Optigo OP5-H', 'Optigo Ardo',
+  ],
+  'Carel': [
+    // pCO (automates process)
+    'c.pCO mini', 'c.pCO', 'c.pCOe', 'pCO5+', 'pCO5 compact', 'pCO3', 'pCO1', 'pCOxs',
+    // µC2 / µC3
+    'µC2', 'µC3', 'µChiller',
+    // boss (superviseur embarqué)
+    'boss', 'boss-mini', 'boss4',
+    // Terminaux
+    'pGD1', 'pGD Touch', 'MasterCella',
+    // Humidificateurs
+    'humiSteam', 'humiFog',
+  ],
+  'Belimo': [
+    // Energy Valve
+    'Energy Valve 6-way', 'Energy Valve 2-way', 'Energy Valve PR+BAC',
+    // Servomoteurs communicants BACnet/Modbus
+    'PR+BAC', 'PR+MOD', 'PRCA-S2-BAC', 'PKCA-S2-BAC',
+    // ThermoValve
+    'ThermoValve',
+    // Capteurs
+    '22DC-11', '22RTM-11',
+    // CM / NM / SM (actionneurs)
+    'CM24A-MP-TPC', 'NM24A-MP', 'SM24A-MP', 'LM24A-MP',
+  ],
+  'Loytec': [
+    // L-INX (automates BACnet/LON)
+    'LINX-100', 'LINX-101', 'LINX-110', 'LINX-150', 'LINX-151', 'LINX-200', 'LINX-201', 'LINX-202', 'LINX-212',
+    // L-IOB (I/O)
+    'LIOB-100', 'LIOB-101', 'LIOB-102', 'LIOB-103', 'LIOB-150', 'LIOB-151', 'LIOB-152', 'LIOB-153', 'LIOB-586', 'LIOB-584',
+    // L-ROC (routeurs)
+    'LROC-100', 'LROC-200', 'LROC-400',
+    // L-VIS (IHM)
+    'LVIS-ME212', 'LVIS-3E112', 'LVIS-ME215',
+  ],
+  'Saia Burgess': [
+    // PCD3 (modulaire principal)
+    'PCD3.M2130', 'PCD3.M2330', 'PCD3.M3120', 'PCD3.M3160', 'PCD3.M5340', 'PCD3.M5540', 'PCD3.M5560', 'PCD3.M6340', 'PCD3.M6560', 'PCD3.M6860',
+    // PCD1 / PCD2
+    'PCD1.M0160', 'PCD1.M2110', 'PCD1.M2120', 'PCD1.M2160', 'PCD2.M4160', 'PCD2.M5540',
+    // PCD4 (ancien gros)
+    'PCD4.M110', 'PCD4.M170', 'PCD4.M340', 'PCD4.M445',
+    // S-Monitoring / S-Web Panel
+    'S-Monitoring', 'PCD7.D4xx', 'PCD7.D457', 'PCD7.D410',
+  ],
 };
 
 // ============ STORAGE ============
